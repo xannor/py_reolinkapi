@@ -1,0 +1,5 @@
+""" Constants """
+
+DEFAULT_TIMEOUT = 30
+DEFAULT_USERNAME = "admin"
+DEFAULT_PASSWORD = ""
