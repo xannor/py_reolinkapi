@@ -1,11 +1,15 @@
 """ extended dataclasses """
 
+import copy
 import dataclasses
 from json import JSONEncoder
 from typing import (
     Callable,
     Mapping,
+    MutableMapping,
+    MutableSequence,
     Optional,
+    Sequence,
     TypeVar,
     Union,
     get_args,
@@ -32,17 +36,17 @@ def non_optional_type(_type: type):
         return _type
     if len(nargs) == 1:
         return nargs[0]
-    return Union[args]
+    return Union[nargs]
 
 
 _KEYWORD_NAME = "keyword"
 
 
-def keyword(name: str, metadata: Mapping = None) -> Mapping:
+def keyword(value: str, metadata: Mapping = None) -> Mapping:
     """add keyword to metadata"""
     if metadata is None:
         metadata = {}
-    metadata[_KEYWORD_NAME] = name
+    metadata[_KEYWORD_NAME] = value
     return metadata
 
 
@@ -69,50 +73,72 @@ def ignore_none(metadata: Mapping = None) -> Mapping:
     return metadata
 
 
+def _asdict_inner_field(
+    value,
+    _field: dataclasses.Field,
+    dict_factory: Callable[[list[tuple[str, any]]], dict],
+):
+    key = _field.metadata.get(_KEYWORD_NAME, _field.name)
+    value = _asdict_inner(value, dict_factory)
+    if value is None and _field.metadata.get(_IGNORE_NAME, False):
+        return None
+
+    return (key, value)
+
+
+def _asdict_inner_dataclass(obj, dict_factory: Callable[[list[tuple[str, any]]], dict]):
+    result = []
+    for _field in dataclasses.fields(obj):
+        value_tuple = _asdict_inner_field(
+            getattr(obj, _field.name), _field, dict_factory
+        )
+        if not value_tuple is None:
+            if isinstance(value_tuple[1], dict):
+                prefix = _field.metadata.get(_FLATTEN_NAME)
+                if prefix is not None:
+                    if not isinstance(prefix, str):
+                        prefix = value_tuple[0] if prefix is True else ""
+                    for k, v in value_tuple[1].items():
+                        result.append((prefix + k, v))
+                    continue
+            result.append(value_tuple)
+
+    if len(result) == 0:
+        return None
+    return dict_factory(result)
+
+
+def _asdict_inner(obj, dict_factory: Callable[[list[tuple[str, any]]], dict]):
+    if dataclasses.is_dataclass(obj):
+        return _asdict_inner_dataclass(obj, dict_factory)
+    if isinstance(obj, tuple) and hasattr(obj, "__fields__"):
+        return type(obj)(*[_asdict_inner(v, dict_factory) for v in obj])
+    if isinstance(obj, Sequence) and not isinstance(obj, str):
+        return list(_asdict_inner(v, dict_factory) for v in obj)
+    if isinstance(obj, Mapping):
+        return dict(
+            (_asdict_inner(k, dict_factory), _asdict_inner(v, dict_factory))
+            for k, v in obj.items()
+        )
+    return copy.deepcopy(obj)
+
+
 @overload
 def asdict(obj, *, dict_factory: Callable[[list[tuple[str, any]]], _T]) -> _T:
-    """as dict wrapper"""
+    pass
 
 
 @overload
 def asdict(obj) -> dict[str, any]:
-    """as dict wrapper"""
-
-
-def _inner_asdict(_dict: dict, cls: type):
-    if not dataclasses.is_dataclass(cls):
-        return _dict
-    for _field in dataclasses.fields(cls):
-        if _field.name not in _dict:
-            continue
-        _type = non_optional_type(_field.type)
-        if dataclasses.is_dataclass(_type):
-            value = _dict.get(_field.name)
-            if isinstance(value, dict):
-                _inner_asdict(value, _type)
-        key = _field.metadata.get(_KEYWORD_NAME, _field.name)
-        if not isinstance(key, str):
-            continue
-        # dirty "rename" will change key order
-        value = _dict.pop(_field.name)
-        if value is None and _field.metadata.get(_IGNORE_NAME, False):
-            continue
-        prefix = _field.metadata.get(_FLATTEN_NAME)
-        if isinstance(value, dict) and prefix is not None:
-            if isinstance(prefix, str):
-                value = dict({prefix + k: v for k, v in value.items()})
-            dict.update(value)
-            continue
-
-        _dict[key] = value
-
-    return _dict
+    pass
 
 
 def asdict(obj, *, dict_factory=dict):
-    """as dict wrapper"""
-    _dict = dataclasses.asdict(obj, dict_factory=dict_factory)
-    return _inner_asdict(_dict, type(obj))
+    """wrapper for dataclasses.asdict"""
+    if not dataclasses.is_dataclass(obj):
+        raise TypeError("asdict() should be called on dataclass instances")
+
+    return _asdict_inner_dataclass(obj, dict_factory)
 
 
 def isdictof(
@@ -147,10 +173,21 @@ def _resolve_typevar(cls: type, __type: type):
     return args[idx]
 
 
-def _inner_fromdict(__dict: dict, cls: type, prefix: str = ""):
-    if not dataclasses.is_dataclass(cls):
-        return None
+def _inner_fromvalue(value, cls: type, factory: Callable = None):
+    cls = non_optional_type(cls)
+    if isinstance(value, dict):
+        return _inner_fromdict(value, cls, factory)
+    if isinstance(value, list):
+        return _inner_fromlist(value, cls, factory)
+    if not isinstance(value, cls):
+        try:
+            return cls(value)
+        except:
+            return None  # TODO : catach all?
+    return value
 
+
+def _inner_fromdataclass(__dict: dict, cls: type, prefix: str = ""):
     init_kwargs = {}
     for _field in dataclasses.fields(cls):
         if not _field.init:
@@ -160,7 +197,7 @@ def _inner_fromdict(__dict: dict, cls: type, prefix: str = ""):
         if _prefix is not None:
             if not isinstance(_prefix, str):
                 _prefix = prefix + _field.name if _prefix else ""
-            value = _inner_fromdict(__dict, _type, _prefix)
+            value = _inner_fromdataclass(__dict, _type, _prefix)
         else:
             value = __dict.get(prefix + _field.metadata.get(_KEYWORD_NAME, _field.name))
         if value is None:
@@ -168,16 +205,14 @@ def _inner_fromdict(__dict: dict, cls: type, prefix: str = ""):
                 value = _field.default
             elif _field.default_factory is not dataclasses.MISSING:
                 value = _field.default_factory()
-        elif dataclasses.is_dataclass(_type) and isinstance(value, dict):
-            value = _inner_fromdict(value, _type)
-        elif isinstance(value, list) and get_origin(_type) is list:
-            value = _inner_fromlist(value, _type)
-        elif not isinstance(value, _type):
-            try:
-                value = _type(value)
-            except Exception:
-                # TODO : limit to just cannot cast style exceptions
-                value = None
+        else:
+            value = _inner_fromvalue(
+                value,
+                _type,
+                _field.default_factory
+                if _field.default_factory is not dataclasses.MISSING
+                else None,
+            )
         if value is None:
             continue
         init_kwargs[_field.name] = value
@@ -185,17 +220,38 @@ def _inner_fromdict(__dict: dict, cls: type, prefix: str = ""):
     return cls(**init_kwargs)
 
 
+def _inner_fromdict(
+    __dict: dict, cls: type, factory: Callable[[], MutableMapping] = None
+):
+    if dataclasses.is_dataclass(cls):
+        return _inner_fromdataclass(__dict, cls)
+    if cls is not Mapping and cls is not dict:
+        return None
+    args = get_args(cls) or get_args(get_origin(cls))
+    if factory is not None:
+        value = factory()
+        value.update({k: _inner_fromvalue(v, args[1]) for k, v in __dict.items()})
+        return value
+    return cls({k: _inner_fromvalue(v, args[1]) for k, v in __dict.items()})
+
+
+def _inner_fromlist(
+    __list: list, cls: type, factory: Callable[[], MutableSequence] = None
+):
+    origin = get_origin(cls)
+    if origin not in (list, tuple, Sequence):
+        return None
+    args = get_args(cls) or get_args(get_origin(cls))
+    if factory is not None:
+        value = factory()
+        for v in __list:
+            value.append(_inner_fromvalue(v, args[0]))
+    return cls((_inner_fromvalue(v, args[0]) for v in __list))
+
+
 def fromdict(__dict: dict, cls: type[_T]) -> Optional[_T]:
     """create dataclass from"""
     return _inner_fromdict(__dict, cls)
-
-
-def _inner_fromlist(__list: list, cls: type):
-    args = get_args(cls)
-    _type = args[0]
-    if not dataclasses.is_dataclass(_type):
-        return __list
-    return list(map(lambda i: _inner_fromdict(i, _type), __list))
 
 
 class DataclassesJSONEncoder(JSONEncoder):

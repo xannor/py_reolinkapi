@@ -1,7 +1,6 @@
 """ REST Connection """
 
 import asyncio
-from dataclasses import MISSING
 import inspect
 from json import loads
 import logging
@@ -9,10 +8,11 @@ from typing import Callable, Optional
 import aiohttp
 
 from ..exceptions import InvalidCredentials, InvalidResponse, ReolinkException
-from ..utils.dataclasses import DataclassesJSONEncoder, fromdict, isdictof
+from ..utils.dataclasses import DataclassesJSONEncoder, asdict, fromdict, isdictof
 
 from .command import (
     CommandRequest,
+    CommandStreamResponse,
     CommandValueResponse,
     UnknownCommandResponse,
     CommandError,
@@ -29,14 +29,17 @@ _LOGGER_DATA = logging.getLogger(__name__ + ".data")
 class Connection:
     """REST Connection"""
 
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwargs):
         self._disconnect_callbacks: list[Callable[[], None]] = []
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self._url: Optional[str] = None
         self._session: Optional[aiohttp.ClientSession] = None
         self.__json_encoder = DataclassesJSONEncoder()
-        if isinstance(self, AuthenticationInterface):
-            self.__get_auth_token = self._get_auth_token
+        self._connection_hash: int = 0
+        if isinstance(self, AuthenticationInterface) and not hasattr(
+            self, "_get_auth_token"
+        ):
+            self._get_auth_token = self._get_auth_token
 
     def _get_disconnect_callbacks(self):
         return self._disconnect_callbacks
@@ -49,10 +52,20 @@ class Connection:
             json_serialize=self.__json_encoder.encode,
         )
 
+    @property
+    def connection_id(self):
+        """connection id"""
+        return self._connection_hash
+
+    @property
+    def base_url(self):
+        """device url"""
+        return self._url or ""
+
     async def connect(
         self,
         hostname: str,
-        port: int = MISSING,
+        port: int = None,
         timeout: float = DEFAULT_TIMEOUT,
         **kwargs,
     ):
@@ -61,18 +74,22 @@ class Connection:
 
         https(bool) is an optional keyword argument needed if using an https connection
         """
-        await self.disconnect()
-        https = bool(kwargs["https"]) if "https" in kwargs else MISSING
-        if port == 443 or (port is MISSING and https):
+        https = bool(kwargs["https"]) if "https" in kwargs else None
+        if port == 443 or (port is None and https):
             https = True
-            port = MISSING
+            port = None
         elif port == 80 and https is not True:
             https = False
-            port = MISSING
+            port = None
         scheme = "https" if https is True else "http"
-        _port = f":{port}" if port is not MISSING else ""
-        self._url = f"{scheme}://{hostname}{_port}/cgi-bin/api.cgi"
-        self._session = self._create_session(timeout)
+        _port = f":{port}" if port is not None else ""
+        _url = f"{scheme}://{hostname}{_port}"
+        if _url != self._url:
+            await self.disconnect()
+        self._url = _url
+        self._connection_hash = hash(self._url)
+        if self._session is None or self._session.closed:
+            self._session = self._create_session(timeout)
 
     async def disconnect(self):
         """disconnect from device"""
@@ -110,7 +127,7 @@ class Connection:
         if len(args) == 0:
             return []
         query = {"cmd": args[0].command}
-        token = self.__get_auth_token()
+        token = self._get_auth_token()
         if token is not None:
             query["token"] = token
 
@@ -131,24 +148,29 @@ class Connection:
         headers = {"accept": "application/json"}
 
         use_get = bool(kwargs["get"]) if "get" in kwargs else False
-        data = self._session.json_serialize(args)
-        _LOGGER_DATA.debug("%s", data)
+        url = f"{self._url}/cgi-bin/api.cgi"
         try:
             if use_get:
-                query["params"] = data
+                query.update(asdict(args[0].param))
+                _LOGGER.debug("GET: %s?%s", url, query)
                 context = self._session.get(
-                    self._url, params=query, headers=headers, allow_redirects=False
+                    url, params=query, headers=headers, allow_redirects=False
                 )
             else:
+                data = self._session.json_serialize(args)
+                _LOGGER.debug("Post: %s?%s", url, query)
+                _LOGGER_DATA.debug("%s", data)
                 context = self._session.post(
-                    self._url,
+                    url,
                     params=query,
                     data=data,
                     headers=headers,
                     allow_redirects=False,
                 )
 
-            async with context as response:
+            cleanup = True
+            response = await context
+            try:
                 if response.status >= 500:
                     _LOGGER.error("got critical (%d) response code", response.status)
                     raise InvalidResponse()
@@ -168,7 +190,15 @@ class Connection:
                     # handle json over text/html (missing accept?)
                     data = loads(data)
                 else:
-                    raise InvalidResponse()
+                    cleanup = False
+                    return [
+                        CommandStreamResponse(
+                            response.content,
+                            content_length=response.content_length,
+                            content_type=response.content_type,
+                            content_disposition=response.content_disposition,
+                        )
+                    ]
 
                 if not isinstance(data, list):
                     data = [data]
@@ -176,6 +206,10 @@ class Connection:
                 _LOGGER_DATA.debug(data)
 
                 return list(map(map_response, data))
+            finally:
+                if cleanup:
+                    response.close()
+                    context.close()
 
         except aiohttp.ClientConnectorError as http_error:
             _LOGGER.error("connection error (%s)", http_error)

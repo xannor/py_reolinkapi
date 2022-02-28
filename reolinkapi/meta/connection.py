@@ -1,6 +1,8 @@
 """ Connection Metaclasses """
 
-from typing import Callable
+from typing import Callable, Optional
+
+import aiohttp
 
 from .command import CommandRequestInterface, CommandResponseInterface
 

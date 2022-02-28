@@ -39,4 +39,4 @@ class Ability(Generic[_T]):
             args = get_args(bases[0])
             _type = args[0]
 
-            self.support = _type(0)
+            self.supported = _type(0)

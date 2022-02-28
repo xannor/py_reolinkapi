@@ -83,17 +83,19 @@ class DeviceInfo:
     """Device Info"""
 
     io: DeviceIO = field(default_factory=DeviceIO, metadata=flatten())
-    audio: int = field(default=0, metadata=keyword("audioNum"))
+    audio_count: int = field(default=0, metadata=keyword("audioNum"))
     build_day: str = field(default="", metadata=keyword("buildDay"))
-    channel: int = field(default=0, metadata=keyword("channelNum"))
+    channels: int = field(default=0, metadata=keyword("channelNum"))
     detail: str = field(default="")
     disks: int = field(default=0, metadata=keyword("diskNum"))
     name: str = field(default="", metadata=keyword("name"))
     type: str = field(default="", metadata=keyword("type"))
     wifi: bool = field(default=False, metadata=keyword("wifi"))
-    _b485: str = field(default="", metadata=keyword("B485"))
+    B485: int = field(default="", metadata=keyword("B485"))
     exact_type: str = field(default="", metadata=keyword("exactType"))
     versions: DeviceVersions = field(default_factory=DeviceVersions, metadata=flatten())
+    serial: str = field(default="")
+    pak_suffix: str = field(default="", metadata=keyword("pakSuffix"))
 
 
 @dataclass
@@ -115,24 +117,26 @@ class DeviceInfoResponse(CommandValueResponse):
 class DeviceInfoRequest(CommandRequest):
     """DevInfo Command Request"""
 
-    COMMAND: ClassVar = "DevInfo"
+    COMMAND: ClassVar = "GetDevInfo"
 
     def __post_init__(self):
         self.command = type(self).COMMAND
+        self.param = None
 
 
 class System:
     """System Commands Mixin"""
 
-    def __init__(self) -> None:
-        super().__init__()
-        if isinstance(self, ConnectionInterface):
-            self.__execute = self._execute
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
+            # type "interface"
+            self._execute = self._execute
 
     async def get_ability(self, username: Optional[str] = None):
         """Get User Permisions"""
 
-        results = await self.__execute(
+        results = await self._execute(
             AbilityRequest(AbilityRequestParameter(UserInfo(username or "NULL")))
         )
         if len(results) != 1 or not isinstance(results[0], AbilityResponse):
@@ -143,7 +147,7 @@ class System:
     async def get_device_info(self):
         """Get Device Information"""
 
-        results = await self.__execute(DeviceInfoRequest())
+        results = await self._execute(DeviceInfoRequest())
         if len(results) != 1 or not isinstance(results[0], DeviceInfoResponse):
             return None
 

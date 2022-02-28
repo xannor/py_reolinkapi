@@ -1,9 +1,8 @@
 """ test auth mixin """
 
-import asyncio
 import os
-from reolinkapi.rest.auth import (
-    Authentication,
+from reolinkapi.rest.security import (
+    Security,
     LoginRequest,
     LoginResponse,
 )
@@ -12,13 +11,13 @@ from reolinkapi.rest import Client
 from .common import MockConnection
 
 _JSON = {
-    LoginRequest: '[{"param": {"User": {"password": "", "userName": "admin"}}, "cmd": "Login", "action": 0}]',
+    LoginRequest: '[{"cmd": "Login", "action": 0, "param": {"User": {"userName": "admin", "password": ""}}}]',
     LoginResponse: '[{"cmd": "Login", "code": 0, "value":{"Token":{"leaseTime":0,"name":""}}}]',
 }
 
 
-class AuthTestRig(MockConnection, Authentication):
-    """Auth test rig"""
+class SecurityTestRig(MockConnection, Security):
+    """Security test rig"""
 
     JSON = _JSON
 
@@ -26,7 +25,7 @@ class AuthTestRig(MockConnection, Authentication):
 async def test_login():
     """login expected values test"""
 
-    client = AuthTestRig()
+    client = SecurityTestRig()
     assert await client.login()
 
 

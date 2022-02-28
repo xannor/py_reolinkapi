@@ -3,9 +3,10 @@
 from abc import ABC
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Callable, TypeVar, overload
+from typing import Callable, Optional, TypeVar, overload
+from aiohttp import StreamReader
 
-from ..utils.dataclasses import keyword
+from ..utils.dataclasses import ignore_none, keyword
 
 
 @dataclass
@@ -28,18 +29,34 @@ class CommandRequestParameter(ABC):
 
 
 @dataclass
+class CommandRequestChannelParam(CommandRequestParameter):
+    """Generic Channel Parameter"""
+
+    channel: int = field(default=0)
+
+
+@dataclass
 class CommandRequest(Command, ABC):
     """Abstract Command Request"""
 
     type: RequestTypes = field(
         default=RequestTypes.VALUEONLY, init=False, metadata=keyword("action")
     )
-    param: CommandRequestParameter = field(init=False)
+    param: Optional[CommandRequestParameter] = field(init=False, metadata=ignore_none())
 
 
 @dataclass
 class CommandResponse(Command, ABC):
     """Abstract Command Response"""
+
+
+class CommandStreamResponse(CommandResponse):
+    """Stream Response"""
+
+    def __init__(self, stream: StreamReader, **kwargs):
+        super().__init__()
+        self.stream = stream
+        self.attributes = kwargs
 
 
 @dataclass
@@ -105,4 +122,6 @@ def get_response_type(class_or_instance: any):
     """Get defined Response Type"""
     if not isinstance(class_or_instance, type):
         class_or_instance = type(class_or_instance)
+    if not hasattr(class_or_instance, _RESPONSE_TYPE):
+        return None
     return getattr(class_or_instance, _RESPONSE_TYPE)

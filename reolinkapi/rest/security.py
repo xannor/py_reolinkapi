@@ -1,4 +1,4 @@
-""" REST Token Athuentication """
+""" Security Commands """
 
 from dataclasses import dataclass, field
 import time
@@ -87,24 +87,26 @@ class LogoutRequest(CommandRequest):
     """Logout Request"""
 
     COMMAND: ClassVar = "Logout"
-    param: None = None
 
     def __post_init__(self):
         self.command = type(self).COMMAND
+        self.param = None
 
 
-class Authentication:
-    """Authentication mixin"""
+class Security:
+    """Security mixin"""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._token: Optional[LoginToken] = None
         self._token_timestamp: float = 0
         self._last_pwd_hash: int = 0
-        if isinstance(self, ConnectionInterface):
+        if isinstance(self, ConnectionInterface) and not hasattr(
+            self, "_get_disconnect_callbacks"
+        ):
             self._get_disconnect_callbacks().append(self.logout)
-            self.__ensure_connection = self._ensure_connection
-            self.__execute = self._execute
+            self._ensure_connection = self._ensure_connection
+            self._execute = self._execute
 
     @property
     def authenticated(self):
@@ -125,6 +127,10 @@ class Authentication:
     def _get_auth_token(self):
         return self._token.value if self.authenticated else None
 
+    @property
+    def token(self):
+        return self._get_auth_token()
+
     async def login(
         self, username: str = DEFAULT_USERNAME, password: str = DEFAULT_PASSWORD
     ) -> bool:
@@ -136,11 +142,11 @@ class Authentication:
             await self.logout()
             self._last_pwd_hash = pwd_hash
 
-        if not self.__ensure_connection():
+        if not self._ensure_connection():
             return False
 
         request = LoginRequest(LoginRequestParameter(LoginInfo(username, password)))
-        results = await self.__execute(request)
+        results = await self._execute(request)
         if len(results) != 1 or not isinstance(results[0], LoginResponse):
             if isinstance(results[0], CommandError):
                 if results[0].error.code == ErrorCodes.LOGIN_FAILED:
@@ -156,8 +162,8 @@ class Authentication:
     async def logout(self):
         """Clear authentication information"""
         if self.authenticated:
-            if self.__ensure_connection():
-                results = await self.__execute(LogoutRequest())
+            if self._ensure_connection():
+                results = await self._execute(LogoutRequest())
                 if len(results) != 1 or not isinstance(results[0], LogoutResponse):
                     raise ResponseError(results[0])
 
