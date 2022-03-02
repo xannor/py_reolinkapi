@@ -2,10 +2,10 @@
 
 from enum import Enum
 from .command import CommandError
-from ..exceptions import ReolinkException
+from ..exceptions import InvalidResponseError
 
 
-class ResponseError(ReolinkException):
+class CommandResponseError(InvalidResponseError):
     """Error Returned"""
 
     response: CommandError

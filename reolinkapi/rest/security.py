@@ -7,7 +7,7 @@ from typing import ClassVar, Optional
 from .command import response_type
 
 from ..utils.dataclasses import keyword
-from .exceptions import ErrorCodes, ResponseError
+from .exceptions import ErrorCodes, CommandResponseError
 
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 
@@ -127,10 +127,6 @@ class Security:
     def _get_auth_token(self):
         return self._token.value if self.authenticated else None
 
-    @property
-    def token(self):
-        return self._get_auth_token()
-
     async def login(
         self, username: str = DEFAULT_USERNAME, password: str = DEFAULT_PASSWORD
     ) -> bool:
@@ -151,7 +147,7 @@ class Security:
             if isinstance(results[0], CommandError):
                 if results[0].error.code == ErrorCodes.LOGIN_FAILED:
                     return False
-                raise ResponseError(results[0])
+                raise CommandResponseError(results[0])
             return False
 
         self._token = results[0].value.token
@@ -165,7 +161,7 @@ class Security:
             if self._ensure_connection():
                 results = await self._execute(LogoutRequest())
                 if len(results) != 1 or not isinstance(results[0], LogoutResponse):
-                    raise ResponseError(results[0])
+                    raise CommandResponseError(results[0])
 
         self._token = None
         self._token_timestamp = 0

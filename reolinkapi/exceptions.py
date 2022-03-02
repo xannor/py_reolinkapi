@@ -1,13 +1,17 @@
 """ Exception """
 
 
-class ReolinkException(Exception):
+class ReolinkError(Exception):
     """Base Error Class"""
 
 
-class InvalidCredentials(ReolinkException):
+class TimeoutError(ReolinkError):
+    """Connection Timed out"""
+
+
+class InvalidCredentialsError(ReolinkError):
     """Bad or missing credentials"""
 
 
-class InvalidResponse(ReolinkException):
+class InvalidResponseError(ReolinkError):
     """Invalid or unexpected response"""

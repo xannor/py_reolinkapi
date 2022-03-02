@@ -130,7 +130,7 @@ class RTSPUrls(Wrapped[StreamTypes, str]):
 
         super.update(
             *((_make_key(k), v) for k, v in args),
-            **{_make_key(k): v for k, v in kwargs.items()}
+            **{_make_key(k): v for k, v in kwargs.items()},
         )
 
 
@@ -230,6 +230,7 @@ class Network:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__cache = {}
         if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
             # type "interface"
             self._execute = self._execute
@@ -237,11 +238,14 @@ class Network:
     async def get_local_link(self):
         """Get Local Link"""
 
+        self.__cache.pop("link", None)
         results = await self._execute(LocalLinkRequest())
         if len(results) != 1 or not isinstance(results[0], LocalLinkResponse):
             return None
 
-        return results[0].value.info
+        result = results[0].value.info
+        self.__cache["link"] = result
+        return result
 
     async def get_channel_status(self):
         """Get Local Link"""
@@ -257,19 +261,61 @@ class Network:
     async def get_ports(self):
         """Get RTSP Url"""
 
+        self.__cache.pop("ports", None)
         results = await self._execute(GetNetworkPortRequest())
         if len(results) != 1 or not isinstance(results[0], GetNetworkPortResponse):
             return None
 
-        return results[0].value.info
+        result = results[0].value.info
+        self.__cache["ports"] = result
+        return results
 
-    async def get_rtsp_url(self, channel: int = 0):
+    async def get_rtsp_url(
+        self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
+    ):
         """Get RTSP Url"""
 
-        results = await self._execute(
-            RTSPUrlRequest(CommandRequestChannelParam(channel))
-        )
-        if len(results) != 1 or not isinstance(results[0], RTSPUrlResponse):
-            return None
+        if "_no_get_rtsp" not in self.__cache:
+            results = await self._execute(
+                RTSPUrlRequest(CommandRequestChannelParam(channel))
+            )
+            if len(results) == 1 and isinstance(results[0], RTSPUrlResponse):
+                return results[0].value.info.url[stream]
+            self.__cache["_no_get_rtsp"] = True
 
-        return results[0].value.info
+        link: LinkInfo = (
+            self.__cache["link"]
+            if "link" in self.__cache
+            else await self.get_local_link()
+        )
+        ports: NetworkPorts = (
+            self.__cache["ports"] if "ports" in self.__cache else await self.get_ports()
+        )
+        port = (
+            f":{ports.rtsp.port}"
+            if ports.rtsp.enabled and ports.rtsp.port > 0 and ports.rtsp.port != 554
+            else ""
+        )
+
+        return f"rtsp://{link.ipv4.address}{port}/h264Preview_{channel:02}_{stream.name.lower()}"
+
+    async def get_rtmp_url(
+        self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
+    ):
+        """Get RTMP Url"""
+
+        link: LinkInfo = (
+            self.__cache["link"]
+            if "link" in self.__cache
+            else await self.get_local_link()
+        )
+        ports: NetworkPorts = (
+            self.__cache["ports"] if "ports" in self.__cache else await self.get_ports()
+        )
+        port = (
+            f":{ports.rtmp.port}"
+            if ports.rtmp.enabled and ports.rtmsp.port > 0 and ports.rtmsp.port != 1935
+            else ""
+        )
+
+        return f"rtmp://{link.ipv4.address}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}"
