@@ -1,10 +1,11 @@
 """Network Mixin"""
+from __future__ import annotations
 
 
-from ctypes import Union
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar, Mapping
+from urllib.parse import quote_plus
 
 from reolinkapi.utils.mappings import Wrapped
 
@@ -18,6 +19,7 @@ from .command import (
     response_type,
 )
 from ..meta.connection import ConnectionInterface
+from ..meta.auth import AuthenticationInterface
 
 from .const import StreamTypes
 
@@ -34,7 +36,7 @@ class LinkIPV4:
     """IPV4 network info"""
 
     gateway: str = field(default="192.168.0.1")
-    address: str = field(default="192.168.0.100")
+    address: str = field(default="192.168.0.100", metadata=keyword("ip"))
     mask: str = field(default="255.255.255.0")
 
 
@@ -120,7 +122,7 @@ class RTSPUrls(Wrapped[StreamTypes, str]):
     """Urls"""
 
     def update(self, *args, **kwargs):
-        def _make_key(key: Union[StreamTypes, str, int]):
+        def _make_key(key: StreamTypes | str | int):
             if isinstance(key, str):
                 if key[-6:] != "Stream":
                     raise KeyError(key)
@@ -234,6 +236,13 @@ class Network:
         if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
             # type "interface"
             self._execute = self._execute
+        if isinstance(self, AuthenticationInterface) and not hasattr(
+            self, "_get_auth_token"
+        ):
+            # type "itnerface"
+            self._get_auth_token = self._get_auth_token
+        elif not hasattr(self, "_get_auth_token"):
+            self._get_auth_token = lambda: None
 
     async def get_local_link(self):
         """Get Local Link"""
@@ -297,7 +306,11 @@ class Network:
             else ""
         )
 
-        return f"rtsp://{link.ipv4.address}{port}/h264Preview_{channel:02}_{stream.name.lower()}"
+        url = f"rtsp://{link.ipv4.address}{port}/h264Preview_{channel:02}_{stream.name.lower()}"
+        auth = self._get_auth_token()
+        if auth is not None:
+            return f"{url}&Token={quote_plus(auth)}"
+        return url
 
     async def get_rtmp_url(
         self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
@@ -314,8 +327,12 @@ class Network:
         )
         port = (
             f":{ports.rtmp.port}"
-            if ports.rtmp.enabled and ports.rtmsp.port > 0 and ports.rtmsp.port != 1935
+            if ports.rtmp.enabled and ports.rtmp.port > 0 and ports.rtmp.port != 1935
             else ""
         )
 
-        return f"rtmp://{link.ipv4.address}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}"
+        url = f"rtmp://{link.ipv4.address}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}"
+        auth = self._get_auth_token()
+        if auth is not None:
+            return f"{url}&Token={quote_plus(auth)}"
+        return url

@@ -1,4 +1,5 @@
 """ extended dataclasses """
+from __future__ import annotations
 
 import copy
 import dataclasses
@@ -8,10 +9,10 @@ from typing import (
     Mapping,
     MutableMapping,
     MutableSequence,
-    Optional,
     Sequence,
     TypeVar,
     Union,
+    get_type_hints,
     get_args,
     get_origin,
     overload,
@@ -141,6 +142,13 @@ def asdict(obj, *, dict_factory=dict):
     return _asdict_inner_dataclass(obj, dict_factory)
 
 
+def _get_field_type(_field: dataclasses.Field, cls: type) -> type:
+    _type = _field.type
+    if not isinstance(_type, str):
+        return _type
+    return get_type_hints(cls)[_field.name]
+
+
 def isdictof(
     __dict: dict,
     cls: type,
@@ -150,14 +158,14 @@ def isdictof(
         return False
     for _field in dataclasses.fields(cls):
         key = _field.metadata.get(_KEYWORD_NAME, _field.name)
-        _type = non_optional_type(_field.type)
+        _type = non_optional_type(_get_field_type(_field, cls))
         if dataclasses.is_dataclass(_type):
             value = __dict.get(key)
             if not isinstance(value, dict):
                 return False
             if not isdictof(value, _type):
                 return False
-        elif not isinstance(__dict.get(key), _field.type):
+        elif not isinstance(__dict.get(key), _type):
             return False
     return True
 
@@ -192,7 +200,7 @@ def _inner_fromdataclass(__dict: dict, cls: type, prefix: str = ""):
     for _field in dataclasses.fields(cls):
         if not _field.init:
             continue
-        _type = _resolve_typevar(cls, non_optional_type(_field.type))
+        _type = _resolve_typevar(cls, non_optional_type(_get_field_type(_field, cls)))
         _prefix = _field.metadata.get(_FLATTEN_NAME)
         if _prefix is not None:
             if not isinstance(_prefix, str):
@@ -249,7 +257,7 @@ def _inner_fromlist(
     return cls((_inner_fromvalue(v, args[0]) for v in __list))
 
 
-def fromdict(__dict: dict, cls: type[_T]) -> Optional[_T]:
+def fromdict(__dict: dict, cls: type[_T]) -> _T | None:
     """create dataclass from"""
     return _inner_fromdict(__dict, cls)
 
