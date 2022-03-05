@@ -1,38 +1,29 @@
 """Record command"""
 
-from dataclasses import dataclass, field
 import random
 import string
-from typing import ClassVar
+from typing import TypedDict
 
-from reolinkapi.utils.dataclasses import keyword
+from .connection import Connection
 
-from .command import CommandRequest, CommandRequestChannelParam, CommandStreamResponse
-from ..meta.connection import ConnectionInterface
+from .typings.commands import (
+    CommandRequest,
+    CommandChannelParameter,
+    CommandRequestTypes,
+)
+
 
 _rnd = random.SystemRandom()
-_rnd_set = string.printable
+_RND_SET = string.printable
 
 
-@dataclass
-class SnapshotRequestParam(CommandRequestChannelParam):
-    """Snapshot Request Param"""
+class SnapshotRequestParameter(CommandChannelParameter):
+    """Snapshot Command Request Parameter"""
 
-    _seed: str = field(init=False, metadata=keyword("rs"))
-
-    def __post_init__(self):
-        self._seed = "".join(_rnd.choice(_rnd_set) for _ in range(16))
+    rs: str
 
 
-@dataclass
-class SnapshotRequest(CommandRequest):
-    """Snapshot Request"""
-
-    COMMAND: ClassVar = "Snap"
-    param: SnapshotRequestParam = field(default_factory=SnapshotRequestParam)
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
+SNAPSHOT_COMMAND = "Snap"
 
 
 class Record:
@@ -40,16 +31,26 @@ class Record:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
+        if isinstance(self, Connection) and not hasattr(self, "_execute"):
             # type "interface"
             self._execute = self._execute
+            self._execute_response = self._execute_response
 
     async def get_snap(self, channel: int = 0):
         """get snapshot"""
-        results = await self._execute(
-            SnapshotRequest(SnapshotRequestParam(channel)), get=True
+
+        seed = "".join(_rnd.choice(_RND_SET) for _ in range(16))
+        response = await self._execute_response(
+            CommandRequest(
+                cmd=SNAPSHOT_COMMAND,
+                action=CommandRequestTypes.VALUE_ONLY,
+                param=SnapshotRequestParameter(channel=channel, rs=seed),
+            )
         )
-        if len(results) != 1 or not isinstance(results[0], CommandStreamResponse):
+        if response is None:
             return None
 
-        return (results[0].stream, results[0].attributes)
+        try:
+            return await response.read()
+        finally:
+            response.close()

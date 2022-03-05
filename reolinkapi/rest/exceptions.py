@@ -1,14 +1,11 @@
 """ Rest Exception """
 
 from enum import Enum
-from .command import CommandError
 from ..exceptions import InvalidResponseError
 
 
-class CommandResponseError(InvalidResponseError):
+class CommandError(InvalidResponseError):
     """Error Returned"""
-
-    response: CommandError
 
 
 class ErrorCode(int):

@@ -1,127 +1,38 @@
 """ System Mixin """
+from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import ClassVar, Optional
+from typing import TypedDict
 
-from ..utils.dataclasses import flatten, ignore_none, keyword
+from reolinkapi.rest.typings.commands import CommandRequest, CommandRequestTypes
 
-from .command import (
-    CommandRequest,
-    CommandRequestParameter,
-    CommandValueResponse,
-    CommandValueResponseValue,
-    response_type,
-)
+from .typings.abilities import Abilities
+from .typings.system import DeviceInfo, UserInfo
 
-from ..meta.connection import ConnectionInterface
-
-from .abilities import Abilities
+from .connection import Connection
 
 
-@dataclass
-class AbilityResponseValue(CommandValueResponseValue):
-    """Abilities Response Value"""
+class GetAbilityResponseValue(TypedDict):
+    """Get Abilities Resposne Value"""
 
-    abilities: Abilities = field(default_factory=Abilities, metadata=keyword("Ability"))
-
-
-@dataclass
-class AbilityResponse(CommandValueResponse):
-    """Abilities Response"""
-
-    value: AbilityResponseValue = field(default_factory=AbilityResponseValue)
+    Ability: Abilities
 
 
-@dataclass
-class UserInfo:
-    """User info"""
+class UserInfoRequestParameter(TypedDict):
+    """User Info Request Parameter"""
 
-    username: str = field(default=None, metadata=keyword("userName"))
-
-
-@dataclass
-class AbilityRequestParameter(CommandRequestParameter):
-    """Ability Parameter"""
-
-    info: UserInfo = field(metadata=keyword("User"))
+    User: UserInfo
 
 
-@dataclass
-@response_type(AbilityResponse)
-class AbilityRequest(CommandRequest):
-    """Authentication Login Request"""
-
-    COMMAND: ClassVar = "GetAbility"
-    param: AbilityRequestParameter = field(
-        default=AbilityRequestParameter, metadata=ignore_none()
-    )
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
+GET_ABILITY_COMMAND = "GetAbility"
 
 
-@dataclass
-class DeviceIO:
-    """Device IO Info"""
+class GetDeviceInfoResponseValue(TypedDict):
+    """Get Device Info Response Value"""
 
-    input: int = field(default=0, metadata=keyword("IOInputNum"))
-    output: int = field(default=0, metadata=keyword("IOOutputNum"))
+    DevInfo: DeviceInfo
 
 
-@dataclass
-class DeviceVersions:
-    """Device Version Info"""
-
-    config: str = field(default="", metadata=keyword("cfgVer"))
-    firmware: str = field(default="", metadata=keyword("firmVer"))
-    hardware: str = field(default="", metadata=keyword("hardVer"))
-    framework: str = field(default="", metadata=keyword("frameworkVer"))
-
-
-@dataclass
-class DeviceInfo:
-    """Device Info"""
-
-    io: DeviceIO = field(default_factory=DeviceIO, metadata=flatten())
-    audio_count: int = field(default=0, metadata=keyword("audioNum"))
-    build_day: str = field(default="", metadata=keyword("buildDay"))
-    channels: int = field(default=0, metadata=keyword("channelNum"))
-    detail: str = field(default="")
-    disks: int = field(default=0, metadata=keyword("diskNum"))
-    name: str = field(default="", metadata=keyword("name"))
-    type: str = field(default="", metadata=keyword("type"))
-    wifi: bool = field(default=False, metadata=keyword("wifi"))
-    B485: int = field(default="", metadata=keyword("B485"))
-    exact_type: str = field(default="", metadata=keyword("exactType"))
-    versions: DeviceVersions = field(default_factory=DeviceVersions, metadata=flatten())
-    serial: str = field(default="")
-    pak_suffix: str = field(default="", metadata=keyword("pakSuffix"))
-
-
-@dataclass
-class DeviceInfoResponseValue(CommandValueResponseValue):
-    """Device Info Response Value"""
-
-    info: DeviceInfo = field(default_factory=DeviceInfo, metadata=keyword("DevInfo"))
-
-
-@dataclass
-class DeviceInfoResponse(CommandValueResponse):
-    """DevInfo Command Response"""
-
-    value: DeviceInfoResponseValue = field(default_factory=DeviceInfoResponseValue)
-
-
-@dataclass
-@response_type(DeviceInfoResponse)
-class DeviceInfoRequest(CommandRequest):
-    """DevInfo Command Request"""
-
-    COMMAND: ClassVar = "GetDevInfo"
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
-        self.param = None
+DEVICE_INFO_COMMAND = "GetDevInfo"
 
 
 class System:
@@ -129,26 +40,46 @@ class System:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
+        if isinstance(self, Connection) and not hasattr(self, "_execute"):
             # type "interface"
             self._execute = self._execute
 
-    async def get_ability(self, username: Optional[str] = None):
+    async def get_ability(self, username: str | None = None):
         """Get User Permisions"""
 
         results = await self._execute(
-            AbilityRequest(AbilityRequestParameter(UserInfo(username or "NULL")))
+            CommandRequest(
+                cmd=GET_ABILITY_COMMAND,
+                action=CommandRequestTypes.VALUE_ONLY,
+                param=UserInfoRequestParameter(
+                    User=UserInfo(userName=username or "null")
+                ),
+            )
         )
-        if len(results) != 1 or not isinstance(results[0], AbilityResponse):
+        if (
+            len(results) != 1
+            or not isinstance(results[0], dict)
+            or results[0]["cmd"] != GET_ABILITY_COMMAND
+        ):
             return None
 
-        return results[0].value.abilities
+        value: GetAbilityResponseValue = results[0]["value"]
+        return value["Ability"]
 
     async def get_device_info(self):
         """Get Device Information"""
 
-        results = await self._execute(DeviceInfoRequest())
-        if len(results) != 1 or not isinstance(results[0], DeviceInfoResponse):
+        results = await self._execute(
+            CommandRequest(
+                cmd=DEVICE_INFO_COMMAND, action=CommandRequestTypes.VALUE_ONLY
+            )
+        )
+        if (
+            len(results) != 1
+            or not isinstance(results[0], dict)
+            or results[0]["cmd"] != DEVICE_INFO_COMMAND
+        ):
             return None
 
-        return results[0].value.info
+        value: GetDeviceInfoResponseValue = results[0]["value"]
+        return value["DevInfo"]

@@ -2,229 +2,64 @@
 from __future__ import annotations
 
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import ClassVar, Mapping
+from typing import TypedDict
 from urllib.parse import quote_plus
 
-from reolinkapi.utils.mappings import Wrapped
+from .connection import Connection, CACHE_TOKEN
 
-from ..utils.dataclasses import flatten, keyword
-
-from .command import (
-    CommandRequest,
-    CommandRequestChannelParam,
-    CommandValueResponse,
-    CommandValueResponseValue,
-    response_type,
-)
-from ..meta.connection import ConnectionInterface
-from ..meta.auth import AuthenticationInterface
+from .typings.commands import CommandRequest, CommandRequestTypes
+from .typings.network import ChannelStatus, LinkInfo, NetworkPorts, RTSPUrls
 
 from .const import StreamTypes
 
 
-class LinkType(Enum):
-    """Link Type"""
+class GetLocalLinkResponseValue(TypedDict):
+    """Get Local Link Response Value"""
 
-    STATIC = "Static"
-    DHCP = "DHCP"
-
-
-@dataclass
-class LinkIPV4:
-    """IPV4 network info"""
-
-    gateway: str = field(default="192.168.0.1")
-    address: str = field(default="192.168.0.100", metadata=keyword("ip"))
-    mask: str = field(default="255.255.255.0")
+    LocalLink: LinkInfo
 
 
-@dataclass
-class LinkInfo:
-    """LinkInfo"""
-
-    active: str = field(default="", metadata=keyword("activeLink"))
-    mac_address: str = field(default="", metadata=keyword("mac"))
-    type: LinkType = field(default_factory=LinkType)
-    ipv4: LinkIPV4 = field(default_factory=LinkIPV4, metadata=keyword("static"))
+GET_LOCAL_LINK_COMMAND = "GetLocalLink"
 
 
-@dataclass
-class LocalLinkResponseValue(CommandValueResponseValue):
-    """Local Link Response Value"""
+class GetChannelStatusResponseValue(TypedDict):
+    """Get Channel Status Response Value"""
 
-    info: LinkInfo = field(default_factory=LinkInfo, metadata=keyword("LocalLink"))
-
-
-@dataclass
-class LocalLinkResponse(CommandValueResponse):
-    """Local Link Response"""
-
-    value: LocalLinkResponseValue = field(default_factory=LocalLinkResponseValue)
+    count: int
+    status: list[ChannelStatus]
 
 
-@dataclass
-@response_type(LocalLinkResponse)
-class LocalLinkRequest(CommandRequest):
-    """Local Link Request"""
-
-    COMMAND: ClassVar = "GetLocalLink"
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
-        self.param = None
+GET_CHANNEL_STATUS_COMMAND = "GetChannelStatus"
 
 
-@dataclass
-class ChannelStatus:
-    """Channel Status"""
+class GetRTSPUrlCommandResponseValue(TypedDict):
+    """Get RTSP Command Response Value"""
 
-    channel: int = field(default=0)
-    name: str = field(default="")
-    online: bool = field(default=False)
-    type_info: str = field(default="", metadata=keyword("typeInfo"))
+    rtspUrl: RTSPUrls
 
 
-@dataclass
-class ChannelStatusResponseValue(CommandValueResponseValue):
-    """Channel Status Response Value"""
-
-    count: int = field(default=0)
-    channels: list[ChannelStatus] = field(
-        default_factory=list, metadata=keyword("status")
-    )
+GET_RTSP_URL_COMMAND = "GetRtspUrl"
 
 
-@dataclass
-class ChannelStatusResponse(CommandValueResponse):
-    """Channel Status Response"""
+class GetNetworkPortsCommandResponseValue(TypedDict):
+    """Get Network Ports Command Response Value"""
 
-    value: ChannelStatusResponseValue = field(
-        default_factory=ChannelStatusResponseValue
-    )
+    NetPort: NetworkPorts
 
 
-@dataclass
-@response_type(ChannelStatusResponse)
-class ChannelStatusRequest(CommandRequest):
-    """Channel Status Request"""
+GET_NETWORK_PORT_COMMAND = "GetNetPort"
 
-    COMMAND: ClassVar = "GetChannelstatus"
+CACHE_PORTS = "ports"
+CACHE_LINK = "link"
 
-    def __post_init__(self):
-        self.command = type(self).COMMAND
-        self.param = None
+_CACHE_NORTSP = "_no_get_rtsp"
 
 
-@dataclass
-class RTSPUrls(Wrapped[StreamTypes, str]):
-    """Urls"""
-
-    def update(self, *args, **kwargs):
-        def _make_key(key: StreamTypes | str | int):
-            if isinstance(key, str):
-                if key[-6:] != "Stream":
-                    raise KeyError(key)
-                key = key[0:6].upper()
-                return StreamTypes[key]
-            return StreamTypes(key)
-
-        super.update(
-            *((_make_key(k), v) for k, v in args),
-            **{_make_key(k): v for k, v in kwargs.items()},
-        )
-
-
-@dataclass
-class RTSPInfo:
-    """RTSP Url Information"""
-
-    channel: int = field(default=0)
-    url: Mapping[StreamTypes, str] = field(
-        default_factory=RTSPUrls,
-        metadata=flatten(),
-    )
-
-
-@dataclass
-class RTSPResponseValue(CommandValueResponseValue):
-    """RTSP Url Response Value"""
-
-    info: RTSPInfo = field(default_factory=RTSPInfo, metadata=keyword("rtspUrl"))
-
-
-@dataclass
-class RTSPUrlResponse(CommandValueResponse):
-    """RTSP Url Response"""
-
-    value: RTSPResponseValue = field(default_factory=RTSPResponseValue)
-
-
-@dataclass
-@response_type(RTSPUrlResponse)
-class RTSPUrlRequest(CommandRequest):
-    """RTSP Url Request"""
-
-    COMMAND: ClassVar = "GetRtspUrl"
-    param: CommandRequestChannelParam = field(
-        default_factory=CommandRequestChannelParam
-    )
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
-
-
-@dataclass
-class PortStatus:
-    """Network Port Status"""
-
-    enabled: bool = field(default=True, metadata=keyword("Enable"))
-    port: int = field(default=0, metadata=keyword("Port"))
-
-
-@dataclass
-class NetworkPorts:
-    """Network Ports"""
-
-    http: PortStatus = field(default_factory=PortStatus, metadata=flatten(True))
-    https: PortStatus = field(default_factory=PortStatus, metadata=flatten(True))
-    media: PortStatus = field(
-        default_factory=lambda: PortStatus(True), metadata=flatten(True)
-    )
-    onvif: PortStatus = field(default_factory=PortStatus, metadata=flatten(True))
-    rtmp: PortStatus = field(default_factory=PortStatus, metadata=flatten(True))
-    rtsp: PortStatus = field(default_factory=PortStatus, metadata=flatten(True))
-
-
-@dataclass
-class GetNetworkPortResponseValue(CommandValueResponseValue):
-    """Get Network Port Response Value"""
-
-    info: NetworkPorts = field(
-        default_factory=NetworkPorts, metadata=keyword("NetPort")
-    )
-
-
-@dataclass
-class GetNetworkPortResponse(CommandValueResponse):
-    """Get Network Port Response"""
-
-    value: GetNetworkPortResponseValue = field(
-        default_factory=GetNetworkPortResponseValue
-    )
-
-
-@dataclass
-@response_type(GetNetworkPortResponse)
-class GetNetworkPortRequest(CommandRequest):
-    """Get Network Port Request"""
-
-    COMMAND: ClassVar = "GetNetPort"
-
-    def __post_init__(self):
-        self.command = type(self).COMMAND
-        self.param = None
+class _LocalCache(TypedDict):
+    ports: NetworkPorts
+    link: LinkInfo
+    token: str
+    _no_get_rtsp: bool
 
 
 class Network:
@@ -232,74 +67,107 @@ class Network:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__cache = {}
-        if isinstance(self, ConnectionInterface) and not hasattr(self, "_execute"):
+        self.__cache: _LocalCache = (
+            getattr(self, "__cache") if hasattr(self, "__cache") else {}
+        )
+        setattr(self, "__cache", self.__cache)
+        if isinstance(self, Connection) and not hasattr(self, "_execute"):
             # type "interface"
             self._execute = self._execute
-        if isinstance(self, AuthenticationInterface) and not hasattr(
-            self, "_get_auth_token"
-        ):
-            # type "itnerface"
-            self._get_auth_token = self._get_auth_token
-        elif not hasattr(self, "_get_auth_token"):
-            self._get_auth_token = lambda: None
 
     async def get_local_link(self):
         """Get Local Link"""
 
-        self.__cache.pop("link", None)
-        results = await self._execute(LocalLinkRequest())
-        if len(results) != 1 or not isinstance(results[0], LocalLinkResponse):
+        self.__cache.pop(CACHE_LINK, None)
+        results = await self._execute(
+            CommandRequest(
+                cmd=GET_LOCAL_LINK_COMMAND, action=CommandRequestTypes.VALUE_ONLY
+            )
+        )
+        if (
+            len(results) != 1
+            or not isinstance(results[0], dict)
+            or results[0]["cmd"] != GET_LOCAL_LINK_COMMAND
+        ):
             return None
 
-        result = results[0].value.info
-        self.__cache["link"] = result
-        return result
+        value: GetLocalLinkResponseValue = results[0]["value"]
+        self.__cache[CACHE_LINK] = value["LocalLink"]
+        return value["LocalLink"]
 
     async def get_channel_status(self):
         """Get Local Link"""
 
-        results = await self._execute(ChannelStatusRequest())
-        if len(results) != 1 or not isinstance(results[0], ChannelStatusResponse):
+        results = await self._execute(
+            CommandRequest(
+                cmd=GET_CHANNEL_STATUS_COMMAND, action=CommandRequestTypes.VALUE_ONLY
+            )
+        )
+        if (
+            len(results) != 1
+            or not isinstance(results[0], dict)
+            or results[0]["cmd"] != GET_CHANNEL_STATUS_COMMAND
+        ):
             return None
 
-        if results[0].value.count != len(results[0].value.channels):
+        value: GetChannelStatusResponseValue = results[0]["value"]
+
+        if value["count"] != len(value["status"]):
             pass  # TODO assert if mismatch? is this an issue?
-        return results[0].value.channels
+        return value["status"]
 
     async def get_ports(self):
         """Get RTSP Url"""
 
-        self.__cache.pop("ports", None)
-        results = await self._execute(GetNetworkPortRequest())
-        if len(results) != 1 or not isinstance(results[0], GetNetworkPortResponse):
+        self.__cache.pop(CACHE_PORTS, None)
+        results = await self._execute(
+            CommandRequest(
+                cmd=GET_NETWORK_PORT_COMMAND, action=CommandRequestTypes.VALUE_ONLY
+            )
+        )
+        if (
+            len(results) != 1
+            or not isinstance(results[0], dict)
+            or results[0]["cmd"] != GET_NETWORK_PORT_COMMAND
+        ):
             return None
 
-        result = results[0].value.info
-        self.__cache["ports"] = result
-        return results
+        value: GetNetworkPortsCommandResponseValue = results[0]["value"]
+        self.__cache[CACHE_PORTS] = value["NetPort"]
+        return value["NetPort"]
 
     async def get_rtsp_url(
         self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
     ):
         """Get RTSP Url"""
 
-        if "_no_get_rtsp" not in self.__cache:
+        if _CACHE_NORTSP not in self.__cache:
             results = await self._execute(
-                RTSPUrlRequest(CommandRequestChannelParam(channel))
+                CommandRequest(
+                    cmd=GET_RTSP_URL_COMMAND, action=CommandRequestTypes.VALUE_ONLY
+                )
             )
-            if len(results) == 1 and isinstance(results[0], RTSPUrlResponse):
-                return results[0].value.info.url[stream]
+            if (
+                len(results) == 1
+                and isinstance(results[0], dict)
+                and results[0]["cmd"] == GET_RTSP_URL_COMMAND
+            ):
+                value: GetRTSPUrlCommandResponseValue = results[0]["value"]
+                return value["rtspUrl"]
+
             self.__cache["_no_get_rtsp"] = True
 
-        link: LinkInfo = (
+        link = (
             self.__cache["link"]
-            if "link" in self.__cache
+            if CACHE_LINK in self.__cache
             else await self.get_local_link()
         )
-        ports: NetworkPorts = (
-            self.__cache["ports"] if "ports" in self.__cache else await self.get_ports()
+        ports = (
+            self.__cache["ports"]
+            if CACHE_PORTS in self.__cache
+            else await self.get_ports()
         )
+
         port = (
             f":{ports.rtsp.port}"
             if ports.rtsp.enabled and ports.rtsp.port > 0 and ports.rtsp.port != 554
@@ -307,9 +175,8 @@ class Network:
         )
 
         url = f"rtsp://{link.ipv4.address}{port}/h264Preview_{channel:02}_{stream.name.lower()}"
-        auth = self._get_auth_token()
-        if auth is not None:
-            return f"{url}&Token={quote_plus(auth)}"
+        if CACHE_TOKEN in self.__cache:
+            return f"{url}&Token={quote_plus(self.__cache['token'])}"
         return url
 
     async def get_rtmp_url(
@@ -317,13 +184,15 @@ class Network:
     ):
         """Get RTMP Url"""
 
-        link: LinkInfo = (
+        link = (
             self.__cache["link"]
-            if "link" in self.__cache
+            if CACHE_LINK in self.__cache
             else await self.get_local_link()
         )
-        ports: NetworkPorts = (
-            self.__cache["ports"] if "ports" in self.__cache else await self.get_ports()
+        ports = (
+            self.__cache["ports"]
+            if CACHE_PORTS in self.__cache
+            else await self.get_ports()
         )
         port = (
             f":{ports.rtmp.port}"
@@ -332,7 +201,6 @@ class Network:
         )
 
         url = f"rtmp://{link.ipv4.address}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}"
-        auth = self._get_auth_token()
-        if auth is not None:
-            return f"{url}&Token={quote_plus(auth)}"
+        if CACHE_TOKEN in self.__cache:
+            return f"{url}&Token={quote_plus(self.__cache['token'])}"
         return url

@@ -3,25 +3,29 @@
 import logging
 import os
 from reolinkapi.rest.network import (
-    ChannelStatusRequest,
-    ChannelStatusResponse,
     Network,
-    LocalLinkRequest,
-    LocalLinkResponse,
-    GetNetworkPortRequest,
-    GetNetworkPortResponse,
+    GET_CHANNEL_STATUS_COMMAND,
+    GET_LOCAL_LINK_COMMAND,
+    GET_NETWORK_PORT_COMMAND,
+    GET_RTSP_URL_COMMAND,
 )
 
 from reolinkapi.rest import Client
 from .common import MockConnection
 
 _JSON = {
-    LocalLinkRequest: '[{"cmd": "GetLocalLink", "action": 0}]',
-    LocalLinkResponse: '[{"cmd": "GetLocalLink", "code": 0, "value":null}]',
-    ChannelStatusRequest: '[{"cmd": "GetChannelstatus", "action": 0}]',
-    ChannelStatusResponse: '[{"cmd": "GetChannelstatus", "code": 0, "value":null}]',
-    GetNetworkPortRequest: '[{"cmd": "GetNetPort", "action": 0}]',
-    GetNetworkPortResponse: '[{"cmd": "GetNetPort", "code": 0, "value":null}]',
+    GET_LOCAL_LINK_COMMAND: (
+        '[{"cmd": "GetLocalLink", "action": 0}]',
+        '[{"cmd": "GetLocalLink", "code": 0, "value":null}]',
+    ),
+    GET_CHANNEL_STATUS_COMMAND: (
+        '[{"cmd": "GetChannelstatus", "action": 0}]',
+        '[{"cmd": "GetChannelstatus", "code": 0, "value":null}]',
+    ),
+    GET_NETWORK_PORT_COMMAND: (
+        '[{"cmd": "GetNetPort", "action": 0}]',
+        '[{"cmd": "GetNetPort", "code": 0, "value":null}]',
+    ),
 }
 
 

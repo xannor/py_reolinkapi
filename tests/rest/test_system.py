@@ -4,20 +4,22 @@ import logging
 import os
 from reolinkapi.rest.system import (
     System,
-    AbilityRequest,
-    AbilityResponse,
-    DeviceInfoRequest,
-    DeviceInfoResponse,
+    GET_ABILITY_COMMAND,
+    DEVICE_INFO_COMMAND,
 )
 
 from reolinkapi.rest import Client
 from .common import MockConnection
 
 _JSON = {
-    AbilityRequest: '[{"param": {"User": {"userName": null}}, "cmd": "GetAbility", "action": 0}]',
-    AbilityResponse: '[{"cmd": "GetAbility", "code": 0, "value":null}]',
-    DeviceInfoRequest: '[{"cmd": "DevInfo", "action": 0}]',
-    DeviceInfoResponse: '[{"cmd": "DevInfo", "code": 0, "value": null}]',
+    GET_ABILITY_COMMAND: (
+        '[{"cmd": "GetAbility", "action": 0, "param": {"User": {"userName": null}}}]',
+        '[{"cmd": "GetAbility", "code": 0, "value":{"Ability":{}}}]',
+    ),
+    DEVICE_INFO_COMMAND: (
+        '[{"cmd": "GetDevInfo", "action": 0}]',
+        '[{"cmd": "GetDevInfo", "code": 0, "value": {"DevInfo":{}}}]',
+    ),
 }
 
 
@@ -31,7 +33,7 @@ async def test_ability():
     """ability expected values test"""
 
     client = SystemTestRig()
-    assert await client.get_ability()
+    assert await client.get_ability() is not None
 
 
 async def test_live_ability(caplog):
@@ -43,8 +45,9 @@ async def test_live_ability(caplog):
     assert await client.login(
         os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
     )
-    assert await client.get_ability()
+    abilities = await client.get_ability()
     await client.disconnect()
+    assert abilities
 
 
 async def test_devinfo():
@@ -52,7 +55,7 @@ async def test_devinfo():
 
     client = SystemTestRig()
     info = await client.get_device_info()
-    assert info
+    assert info is not None
 
 
 async def test_live_devinfo(caplog):
@@ -65,5 +68,5 @@ async def test_live_devinfo(caplog):
         os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
     )
     info = await client.get_device_info()
-    assert info
+    assert info is not None
     await client.disconnect()

@@ -1,31 +1,22 @@
 """ REST Connection """
+from __future__ import annotations
+
 
 import asyncio
 import inspect
-from json import loads
+import json
 import logging
-from typing import Callable, Optional, Protocol
+from typing import Callable, Protocol, TypedDict
 import aiohttp
-from aiohttp.typedefs import JSONEncoder
 
 from ..exceptions import (
     InvalidCredentialsError,
     InvalidResponseError,
     ReolinkError,
-    TimeoutError as ReolinkTimeoutError,
 )
-from ..utils.dataclasses import DataclassesJSONEncoder, asdict, fromdict, isdictof
+from .typings.commands import CommandRequest, CommandResponse
+from .security import CACHE_TOKEN
 
-from .command import (
-    CommandRequest,
-    CommandStreamResponse,
-    CommandValueResponse,
-    UnknownCommandResponse,
-    CommandError,
-    get_response_type,
-)
-
-from ..meta.auth import AuthenticationInterface
 from ..const import DEFAULT_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,19 +26,23 @@ _LOGGER_DATA = logging.getLogger(__name__ + ".data")
 class SessionFactory(Protocol):
     """Session Factory"""
 
-    def __call__(
-        self, base_url: str, timeout: int, json_serialize: JSONEncoder
-    ) -> aiohttp.ClientSession:
+    def __call__(self, base_url: str, timeout: int) -> aiohttp.ClientSession:
         ...
 
 
-def _default_create_session(base_url: str, timeout: int, json_serialize):
+def _default_create_session(base_url: str, timeout: int):
     return aiohttp.ClientSession(
         base_url=base_url,
         timeout=aiohttp.ClientTimeout(total=timeout),
         connector=aiohttp.TCPConnector(ssl=False),
-        json_serialize=json_serialize,
     )
+
+
+class _LocalCache(TypedDict):
+    token: str
+    url: str
+    connection_id: int
+    hostname: str
 
 
 class Connection:
@@ -56,24 +51,17 @@ class Connection:
     def __init__(self, *args, session_factory: SessionFactory = None, **kwargs):
         self._disconnect_callbacks: list[Callable[[], None]] = []
         super().__init__(*args, **kwargs)
-        self.__cache = {}
-        self._session: Optional[aiohttp.ClientSession] = None
-        self.__json_encoder = DataclassesJSONEncoder()
+        self.__cache: _LocalCache = (
+            getattr(self, "__cache") if hasattr(self, "__cache") else {}
+        )
+        setattr(self, "__cache", self.__cache)
+        self._session: aiohttp.ClientSession | None = None
         self._session_factory: SessionFactory = (
             session_factory or _default_create_session
         )
-        if isinstance(self, AuthenticationInterface) and not hasattr(
-            self, "_get_auth_token"
-        ):
-            self._get_auth_token = self._get_auth_token
-
-    def _get_disconnect_callbacks(self):
-        return self._disconnect_callbacks
 
     def _create_session(self, timeout: int):
-        return self._session_factory(
-            self.__cache["url"], timeout, self.__json_encoder.encode
-        )
+        return self._session_factory(self.__cache["url"], timeout)
 
     @property
     def connection_id(self) -> int:
@@ -112,11 +100,9 @@ class Connection:
             return
         if "id" in self.__cache:
             await self.disconnect()
-        self.__cache = {
-            "url": _url,
-            "connection_id": _id,
-            "hostname": hostname,
-        }  # reset cache on a new session
+        self.__cache["url"] = _url
+        self.__cache["connection_id"] = _id
+        self.__cache["hostname"] = hostname
         if self._session is None or self._session.closed:
             self._session = self._create_session(timeout)
 
@@ -133,7 +119,7 @@ class Connection:
         if not self._session.closed:
             await self._session.close()
         self._session = None
-        self.__cache = {}
+        self.__cache.clear()
 
     def _ensure_connection(self):
         if self._session is None:
@@ -144,42 +130,24 @@ class Connection:
 
         return True
 
-    async def _execute(self, *args: CommandRequest, **kwargs):
-        """
-        Internal API
+    async def _execute_response(self, *args: CommandRequest, use_get: bool = False):
+        """Internal API"""
 
-        get(bool) can be specified to use a GET request instead of a POST
-        """
         if not self._ensure_connection():
-            return []
+            return None
 
         if len(args) == 0:
-            return []
-        query = {"cmd": args[0].command}
-        token = self._get_auth_token()
-        if token is not None:
-            query["token"] = token
-
-        types = {
-            req.command: get_response_type(req) or UnknownCommandResponse
-            for req in args
-        }
-
-        def map_response(__dict: dict):
-            if isdictof(__dict, CommandError):
-                return fromdict(__dict, CommandError)
-            if not isdictof(__dict, CommandValueResponse):
-                raise InvalidResponseError()
-            command = __dict.get("cmd")
-            _type = types.get(command, UnknownCommandResponse)
-            return fromdict(__dict, _type)
+            return None
+        query = {"cmd": args[0]["cmd"]}
+        if CACHE_TOKEN in self.__cache:
+            query["token"] = self.__cache["token"]
 
         headers = {"accept": "application/json"}
 
-        use_get = bool(kwargs["get"]) if "get" in kwargs else False
+        cleanup = True
         try:
             if use_get:
-                query.update(asdict(args[0].param))
+                query.update(args[0]["param"])
                 _LOGGER.debug("GET: ?%s", query)
                 context = self._session.get(
                     "/cgi-bin/api.cgi",
@@ -199,55 +167,56 @@ class Connection:
                     allow_redirects=False,
                 )
 
-            cleanup = True
             response = await context
-            try:
-                if response.status >= 500:
-                    _LOGGER.error("got critical (%d) response code", response.status)
-                    raise InvalidResponseError()
-                if response.status >= 400:
-                    _LOGGER.error("got auth (%d) response code", response.status)
-                    raise InvalidCredentialsError()
+            if response.status >= 500:
+                _LOGGER.error("got critical (%d) response code", response.status)
+                raise InvalidResponseError()
+            if response.status >= 400:
+                _LOGGER.error("got auth (%d) response code", response.status)
+                raise InvalidCredentialsError()
 
-                if response.content_type == "appliction/json":
-                    data = await response.json()
-                elif response.content_type == "text/html":
-                    data = await response.text()
-
-                    if data[0] != "[":
-                        _LOGGER.error("did not get json as response: (%s)", data)
-                        raise InvalidResponseError()
-
-                    # handle json over text/html (missing accept?)
-                    data = loads(data)
-                else:
-                    cleanup = False
-                    return [
-                        CommandStreamResponse(
-                            response.content,
-                            content_length=response.content_length,
-                            content_type=response.content_type,
-                            content_disposition=response.content_disposition,
-                        )
-                    ]
-
-                if not isinstance(data, list):
-                    data = [data]
-
-                _LOGGER_DATA.debug(data)
-
-                return list(map(map_response, data))
-            finally:
-                if cleanup:
-                    response.close()
-                    context.close()
-
+            cleanup = False
+            return response
         except aiohttp.ClientConnectorError as http_error:
             _LOGGER.error("connection error (%s)", http_error)
             raise ReolinkError(http_error) from None
         except asyncio.TimeoutError:
             _LOGGER.error("timeout")
-            raise ReolinkTimeoutError() from None
+            raise
         except Exception as _e:
             _LOGGER.error("Unhnandled exception (%s)", _e)
             raise ReolinkError(_e) from None
+        finally:
+            if cleanup:
+                response.close()
+                context.close()
+
+    async def _execute(
+        self, *args: CommandRequest, use_get: bool = False
+    ) -> list[CommandResponse]:
+        """Internal API"""
+        response = await self._execute_response(*args, use_get=use_get)
+        if response is None:
+            return []
+
+        try:
+            if response.content_type == "appliction/json":
+                data = await response.json()
+            elif response.content_type == "text/html":
+                data = await response.text()
+
+                if data[0] != "[":
+                    _LOGGER.error("did not get json as response: (%s)", data)
+                    raise InvalidResponseError()
+
+                # handle json over text/html (missing accept?)
+                data = json.loads(data)
+            else:
+                raise InvalidResponseError()
+
+        finally:
+            response.close()
+
+        if not isinstance(data, list):
+            data = [data]
+        return data

@@ -1,13 +1,12 @@
+"""Command Testing Aparatus"""
+
 import json
 from typing import Generic, TypeVar
 
-from reolinkapi.meta.command import CommandRequestInterface, CommandResponseInterface
-from reolinkapi.rest.command import get_response_type
-from reolinkapi.utils.dataclasses import DataclassesJSONEncoder, fromdict
+from reolinkapi.rest.typings.commands import CommandRequest, CommandResponse
 
-jsonEnc = DataclassesJSONEncoder()
 
-_T = TypeVar("_T", bound=dict[type, str])
+_T = TypeVar("_T", bound=dict[str, tuple[str, str]])
 
 
 class MockConnection(Generic[_T]):
@@ -19,23 +18,17 @@ class MockConnection(Generic[_T]):
         self._disconnect_callbacks = []
         super().__init__()
 
-    def _get_disconnect_callbacks(self):
-        """mocked callbacks"""
-        return self._disconnect_callbacks
-
     def _ensure_connection(self) -> bool:
         """mocked ensure connect"""
         return True
 
     async def _execute(
-        self, *args: CommandRequestInterface
-    ) -> list[CommandResponseInterface]:
+        self, *args: CommandRequest, use_get: bool = False
+    ) -> list[CommandResponse]:
         """mocked _execue"""
-        _json = jsonEnc.encode(args)
-        assert _json == type(self).JSON[type(args[0])], (
-            "unexpected json of `%s`" % _json
-        )
-        _type = get_response_type(type(args[0]))
-
-        data = json.loads(type(self).JSON[_type])
-        return [fromdict(data[0], _type)]
+        _J = type(self).JSON
+        assert args[0]["cmd"] in _J
+        _J = _J[args[0]["cmd"]]
+        _json = json.dumps(args)
+        assert _json == _J[0], "unexpected json of `%s`" % _json
+        return json.loads(_J[1])
