@@ -1,9 +1,14 @@
 """ System Mixin """
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Iterable, TypedDict
 
-from reolinkapi.rest.typings.commands import CommandRequest, CommandRequestTypes
+from .typings.commands import (
+    CommandRequest,
+    CommandRequestTypes,
+    CommandResponse,
+    filter_command_responses,
+)
 
 from .typings.abilities import Abilities
 from .typings.system import DeviceInfo, UserInfo
@@ -15,6 +20,14 @@ class GetAbilityResponseValue(TypedDict):
     """Get Abilities Resposne Value"""
 
     Ability: Abilities
+
+
+def _cast_ability_response_value(responses: Iterable[CommandResponse]):
+    def _cast(response: CommandResponse):
+        value: GetAbilityResponseValue = response["value"]
+        return value["Ability"]
+
+    return map(_cast, responses)
 
 
 class UserInfoRequestParameter(TypedDict):
@@ -32,6 +45,14 @@ class GetDeviceInfoResponseValue(TypedDict):
     DevInfo: DeviceInfo
 
 
+def _cast_device_info_response_value(responses: Iterable[CommandResponse]):
+    def _cast(response: CommandResponse):
+        value: GetDeviceInfoResponseValue = response["value"]
+        return value["DevInfo"]
+
+    return map(_cast, responses)
+
+
 DEVICE_INFO_COMMAND = "GetDevInfo"
 
 
@@ -44,42 +65,65 @@ class System:
             # type "interface"
             self._execute = self._execute
 
+    @staticmethod
+    def create_get_ability(
+        username: str | None = None,
+        _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ):
+        """Create GetAbility Request"""
+        return CommandRequest(
+            cmd=GET_ABILITY_COMMAND,
+            action=_type,
+            param=UserInfoRequestParameter(User=UserInfo(userName=username or "null")),
+        )
+
+    @staticmethod
+    def get_ability_responses(responses: Iterable[CommandResponse]):
+        """Get GetAbility Responses"""
+
+        return _cast_ability_response_value(
+            filter_command_responses(GET_ABILITY_COMMAND, responses)
+        )
+
     async def get_ability(self, username: str | None = None):
         """Get User Permisions"""
 
-        results = await self._execute(
-            CommandRequest(
-                cmd=GET_ABILITY_COMMAND,
-                action=CommandRequestTypes.VALUE_ONLY,
-                param=UserInfoRequestParameter(
-                    User=UserInfo(userName=username or "null")
-                ),
-            )
+        abilities = next(
+            _cast_ability_response_value(
+                filter_command_responses(
+                    GET_ABILITY_COMMAND,
+                    await self._execute(System.create_get_ability(username)),
+                )
+            ),
+            None,
         )
-        if (
-            len(results) != 1
-            or not isinstance(results[0], dict)
-            or results[0]["cmd"] != GET_ABILITY_COMMAND
-        ):
-            return None
+        return abilities
 
-        value: GetAbilityResponseValue = results[0]["value"]
-        return value["Ability"]
+    @staticmethod
+    def create_get_device_info(
+        _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ):
+        """Create DeviceInfo Request"""
+        return CommandRequest(cmd=DEVICE_INFO_COMMAND, action=_type)
+
+    @staticmethod
+    def get_device_info_responses(responses: Iterable[CommandResponse]):
+        """Get DeviceInfo Responses"""
+
+        return _cast_device_info_response_value(
+            filter_command_responses(DEVICE_INFO_COMMAND, responses)
+        )
 
     async def get_device_info(self):
         """Get Device Information"""
 
-        results = await self._execute(
-            CommandRequest(
-                cmd=DEVICE_INFO_COMMAND, action=CommandRequestTypes.VALUE_ONLY
-            )
+        devinfo = next(
+            _cast_device_info_response_value(
+                filter_command_responses(
+                    DEVICE_INFO_COMMAND,
+                    await self._execute(System.create_get_device_info()),
+                )
+            ),
+            None,
         )
-        if (
-            len(results) != 1
-            or not isinstance(results[0], dict)
-            or results[0]["cmd"] != DEVICE_INFO_COMMAND
-        ):
-            return None
-
-        value: GetDeviceInfoResponseValue = results[0]["value"]
-        return value["DevInfo"]
+        return devinfo

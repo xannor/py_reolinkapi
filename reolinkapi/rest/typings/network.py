@@ -62,3 +62,10 @@ class NetworkPorts(TypedDict):
     rtmpPort: int
     rtspnable: bool
     rtspPort: int
+
+
+class P2PInfo(TypedDict):
+    """P2P Info"""
+
+    enable: bool
+    uid: str

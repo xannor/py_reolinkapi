@@ -6,7 +6,7 @@ import asyncio
 import inspect
 import json
 import logging
-from typing import Callable, Protocol, TypedDict
+from typing import Callable, Iterable, Protocol, TypedDict
 import aiohttp
 
 from ..exceptions import (
@@ -43,6 +43,9 @@ class _LocalCache(TypedDict):
     url: str
     connection_id: int
     hostname: str
+
+
+CACHE_CONNECTION_ID = "connection_id"
 
 
 class Connection:
@@ -96,9 +99,9 @@ class Connection:
         _port = f":{port}" if port is not None else ""
         _url = f"{scheme}://{hostname}{_port}"
         _id = hash(_url)
-        if "id" in self.__cache and _id == self.__cache["id"]:
+        if CACHE_CONNECTION_ID in self.__cache and _id == self.__cache["connection_id"]:
             return
-        if "id" in self.__cache:
+        if CACHE_CONNECTION_ID in self.__cache:
             await self.disconnect()
         self.__cache["url"] = _url
         self.__cache["connection_id"] = _id
@@ -109,6 +112,7 @@ class Connection:
     async def disconnect(self):
         """disconnect from device"""
 
+        self.__cache.clear()
         if self._session is None:
             return
         for callback in self._disconnect_callbacks:
@@ -119,7 +123,6 @@ class Connection:
         if not self._session.closed:
             await self._session.close()
         self._session = None
-        self.__cache.clear()
 
     def _ensure_connection(self):
         if self._session is None:
@@ -148,7 +151,7 @@ class Connection:
         try:
             if use_get:
                 query.update(args[0]["param"])
-                _LOGGER.debug("GET: ?%s", query)
+                _LOGGER.debug("GET: %s?%s", self.__cache["hostname"], query)
                 context = self._session.get(
                     "/cgi-bin/api.cgi",
                     params=query,
@@ -157,8 +160,8 @@ class Connection:
                 )
             else:
                 data = self._session.json_serialize(args)
-                _LOGGER.debug("Post: ?%s", query)
-                _LOGGER_DATA.debug("%s", data)
+                _LOGGER.debug("POST: %s?%s", self.__cache["hostname"], query)
+                _LOGGER_DATA.debug("<-%s", data)
                 context = self._session.post(
                     "/cgi-bin/api.cgi",
                     params=query,
@@ -188,7 +191,8 @@ class Connection:
             raise ReolinkError(_e) from None
         finally:
             if cleanup:
-                response.close()
+                if response is not None:
+                    response.close()
                 context.close()
 
     async def _execute(
@@ -219,4 +223,9 @@ class Connection:
 
         if not isinstance(data, list):
             data = [data]
+        _LOGGER_DATA.debug("->%s", data)
         return data
+
+    async def batch(self, commands: Iterable[CommandRequest]):
+        """Execute a batch of commands"""
+        return await self._execute(*commands)

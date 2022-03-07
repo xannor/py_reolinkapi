@@ -13,7 +13,7 @@ from .common import MockConnection
 
 _JSON = {
     GET_ABILITY_COMMAND: (
-        '[{"cmd": "GetAbility", "action": 0, "param": {"User": {"userName": null}}}]',
+        '[{"cmd": "GetAbility", "action": 0, "param": {"User": {"userName": "null"}}}]',
         '[{"cmd": "GetAbility", "code": 0, "value":{"Ability":{}}}]',
     ),
     DEVICE_INFO_COMMAND: (

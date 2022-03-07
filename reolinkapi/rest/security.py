@@ -74,6 +74,11 @@ class Security:
         rem = time.time() - self.__cache[CACHE_TOKEN_EXPIRES]
         return rem if rem > 0 else 0
 
+    @property
+    def authentication_id(self):
+        """authentication id"""
+        return self._last_pwd_hash
+
     async def login(
         self, username: str = DEFAULT_USERNAME, password: str = DEFAULT_PASSWORD
     ) -> bool:

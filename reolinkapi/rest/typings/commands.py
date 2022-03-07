@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TypedDict
+from typing import Iterable, TypedDict
 
 
 class CommandRequestTypes(IntEnum):
@@ -27,6 +27,28 @@ class CommandRequest(TypedDict):
     cmd: str
     action: int
     param: dict[str, any] | None
+
+
+def filter_command_responses(cmd: str, responses: Iterable[CommandResponse]):
+    """filter responses for command successes"""
+    return filter(
+        lambda response: response["cmd"] == cmd and "value" in response, responses
+    )
+
+
+def filter_command_errors(cmd: str, responses: Iterable[CommandResponse]):
+    """filter responses for command errors"""
+
+    def _cast(response: CommandResponse):
+        error: CommandResponseErrorValue = response["error"]
+        return error["error"]
+
+    return map(
+        _cast,
+        filter(
+            lambda response: response["cmd"] == cmd and "error" in response, responses
+        ),
+    )
 
 
 class CommandResponse(TypedDict):

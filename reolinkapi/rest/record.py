@@ -2,7 +2,6 @@
 
 import random
 import string
-from typing import TypedDict
 
 from .connection import Connection
 
@@ -45,7 +44,8 @@ class Record:
                 cmd=SNAPSHOT_COMMAND,
                 action=CommandRequestTypes.VALUE_ONLY,
                 param=SnapshotRequestParameter(channel=channel, rs=seed),
-            )
+            ),
+            use_get=True,  # Duo repeats channel 0 with a post snap request
         )
         if response is None:
             return None
