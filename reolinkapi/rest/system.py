@@ -13,7 +13,7 @@ from .typings.commands import (
 from .typings.abilities import Abilities
 from .typings.system import DeviceInfo, UserInfo
 
-from .connection import Connection
+from . import connection
 
 
 class GetAbilityResponseValue(TypedDict):
@@ -61,9 +61,10 @@ class System:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if isinstance(self, Connection) and not hasattr(self, "_execute"):
+        other: any = self
+        if isinstance(other, connection.Connection) and not hasattr(self, "_execute"):
             # type "interface"
-            self._execute = self._execute
+            self._execute = other._execute
 
     @staticmethod
     def create_get_ability(

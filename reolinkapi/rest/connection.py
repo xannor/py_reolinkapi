@@ -6,7 +6,7 @@ import asyncio
 import inspect
 import json
 import logging
-from typing import Callable, Iterable, Protocol, TypedDict
+from typing import Callable, Iterable, Protocol
 import aiohttp
 
 from ..exceptions import (
@@ -15,7 +15,8 @@ from ..exceptions import (
     ReolinkError,
 )
 from .typings.commands import CommandRequest, CommandResponse
-from .security import CACHE_TOKEN
+
+from . import security, encrypt
 
 from ..const import DEFAULT_TIMEOUT
 
@@ -38,14 +39,8 @@ def _default_create_session(base_url: str, timeout: int):
     )
 
 
-class _LocalCache(TypedDict):
-    token: str
-    url: str
-    connection_id: int
-    hostname: str
-
-
 CACHE_CONNECTION_ID = "connection_id"
+CACHE_URL = "url"
 
 
 class Connection:
@@ -54,41 +49,52 @@ class Connection:
     def __init__(self, *args, session_factory: SessionFactory = None, **kwargs):
         self._disconnect_callbacks: list[Callable[[], None]] = []
         super().__init__(*args, **kwargs)
-        self.__cache: _LocalCache = (
-            getattr(self, "__cache") if hasattr(self, "__cache") else {}
-        )
-        setattr(self, "__cache", self.__cache)
-        self._session: aiohttp.ClientSession | None = None
-        self._session_factory: SessionFactory = (
+        self.__session: aiohttp.ClientSession | None = None
+        self.__session_factory: SessionFactory = (
             session_factory or _default_create_session
         )
+        self.__base_url = ""
+        self.__hostname = ""
+        self.__connection_id = 0
+        self._https = False
+        other: any = self
+        if isinstance(other, security.Security) and not hasattr(self, "_auth_token"):
+            self._auth_token = other._auth_token
+        if isinstance(other, encrypt.Encrypt):
+            self.__can_encrypt = True
+            if not hasattr(self, "encrypt"):
+                self._encrypt = other._encrypt
+                self._decrypt = other._decrypt
 
     def _create_session(self, timeout: int):
-        return self._session_factory(self.__cache["url"], timeout)
+        return self.__session_factory(self.__base_url, timeout)
 
     @property
-    def connection_id(self) -> int:
+    def connection_id(self):
         """connection id"""
-        return self.__cache["connection_id"] if "connection_id" in self.__cache else 0
+        return self.__connection_id
 
     @property
-    def base_url(self) -> str:
+    def base_url(self):
         """base url"""
-        return self.__cache["url"] if "url" in self.__cache else ""
+        return self.__base_url
+
+    @property
+    def hostname(self):
+        """hostname"""
+        return self.__hostname
 
     async def connect(
         self,
         hostname: str,
         port: int = None,
         timeout: float = DEFAULT_TIMEOUT,
-        **kwargs,
+        *,
+        https: bool = None,
     ):
         """
         setup connection to device
-
-        https(bool) is an optional keyword argument needed if using an https connection
         """
-        https = bool(kwargs["https"]) if "https" in kwargs else None
         if port == 443 or (port is None and https):
             https = True
             port = None
@@ -97,43 +103,47 @@ class Connection:
             port = None
         scheme = "https" if https is True else "http"
         _port = f":{port}" if port is not None else ""
-        _url = f"{scheme}://{hostname}{_port}"
-        _id = hash(_url)
-        if CACHE_CONNECTION_ID in self.__cache and _id == self.__cache["connection_id"]:
+        url = f"{scheme}://{hostname}{_port}"
+        _id = hash(url)
+        if _id == self.__connection_id:
             return
-        if CACHE_CONNECTION_ID in self.__cache:
+        if self.__connection_id != 0:
             await self.disconnect()
-        self.__cache["url"] = _url
-        self.__cache["connection_id"] = _id
-        self.__cache["hostname"] = hostname
-        if self._session is None or self._session.closed:
-            self._session = self._create_session(timeout)
+        self.__base_url = url
+        self.__connection_id = _id
+        self.__hostname = hostname
+        self._https = https
+        if self.__session is None or self.__session.closed:
+            self.__session = self._create_session(timeout)
 
     async def disconnect(self):
         """disconnect from device"""
 
-        self.__cache.clear()
-        if self._session is None:
+        if self.__session is None:
             return
         for callback in self._disconnect_callbacks:
             if inspect.iscoroutinefunction(callback):
                 await callback()
             else:
                 callback()
-        if not self._session.closed:
-            await self._session.close()
-        self._session = None
+        if not self.__session.closed:
+            await self.__session.close()
+        self.__connection_id = 0
+        self.__base_url = ""
+        self.__hostname = ""
+        self._https = False
+        self.__session = None
 
     def _ensure_connection(self):
-        if self._session is None:
+        if self.__session is None:
             return False
 
-        if self._session.closed:
-            self._session = self._create_session(self._session.timeout.total)
+        if self.__session.closed:
+            self.__session = self._create_session(self.__session.timeout.total)
 
         return True
 
-    async def _execute_response(self, *args: CommandRequest, use_get: bool = False):
+    async def _execute_request(self, *args: CommandRequest, use_get: bool = False):
         """Internal API"""
 
         if not self._ensure_connection():
@@ -142,8 +152,8 @@ class Connection:
         if len(args) == 0:
             return None
         query = {"cmd": args[0]["cmd"]}
-        if CACHE_TOKEN in self.__cache:
-            query["token"] = self.__cache["token"]
+        if self._auth_token != "":
+            query["token"] = self._auth_token
 
         headers = {"accept": "application/json"}
 
@@ -151,18 +161,21 @@ class Connection:
         try:
             if use_get:
                 query.update(args[0]["param"])
-                _LOGGER.debug("GET: %s?%s", self.__cache["hostname"], query)
-                context = self._session.get(
+                _LOGGER.debug("GET: %s?%s", self.__hostname, query)
+                context = self.__session.get(
                     "/cgi-bin/api.cgi",
                     params=query,
                     headers=headers,
                     allow_redirects=False,
                 )
             else:
-                data = self._session.json_serialize(args)
-                _LOGGER.debug("POST: %s?%s", self.__cache["hostname"], query)
+                data = self.__session.json_serialize(args)
+                _LOGGER.debug("POST: %s?%s", self.__hostname, query)
                 _LOGGER_DATA.debug("<-%s", data)
-                context = self._session.post(
+                if self.__can_encrypt and not self._https:
+                    data = self._encrypt(data)
+                    encrypted = True
+                context = self.__session.post(
                     "/cgi-bin/api.cgi",
                     params=query,
                     data=data,
@@ -179,7 +192,7 @@ class Connection:
                 raise InvalidCredentialsError()
 
             cleanup = False
-            return response
+            return (response, bool(encrypted))
         except aiohttp.ClientConnectorError as http_error:
             _LOGGER.error("connection error (%s)", http_error)
             raise ReolinkError(http_error) from None
@@ -195,28 +208,23 @@ class Connection:
                     response.close()
                 context.close()
 
-    async def _execute(
-        self, *args: CommandRequest, use_get: bool = False
+    async def _process_response(
+        self, response: aiohttp.ClientResponse, encrypted: bool = False
     ) -> list[CommandResponse]:
-        """Internal API"""
-        response = await self._execute_response(*args, use_get=use_get)
         if response is None:
             return []
 
         try:
-            if response.content_type == "appliction/json":
-                data = await response.json()
-            elif response.content_type == "text/html":
-                data = await response.text()
+            data = await response.text()
+            if self.__can_encrypt and encrypted and data[0] != "[":
+                data = self._decrypt(data)
 
-                if data[0] != "[":
-                    _LOGGER.error("did not get json as response: (%s)", data)
-                    raise InvalidResponseError()
-
-                # handle json over text/html (missing accept?)
-                data = json.loads(data)
-            else:
+            if data[0] != "[":
+                _LOGGER.error("did not get json as response: (%s)", data)
                 raise InvalidResponseError()
+
+            # handle json over text/html (missing accept?)
+            data = json.loads(data)
 
         finally:
             response.close()
@@ -225,6 +233,12 @@ class Connection:
             data = [data]
         _LOGGER_DATA.debug("->%s", data)
         return data
+
+    async def _execute(self, *args: CommandRequest, use_get: bool = False):
+        """Internal API"""
+        return await self._process_response(
+            *(await self._execute_request(*args, use_get=use_get))
+        )
 
     async def batch(self, commands: Iterable[CommandRequest]):
         """Execute a batch of commands"""

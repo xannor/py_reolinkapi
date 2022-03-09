@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Iterable, TypedDict
 from urllib.parse import quote_plus
 
-from .connection import Connection, CACHE_TOKEN
+from . import connection, security
 
 from .typings.commands import (
     CommandRequest,
@@ -103,31 +103,27 @@ GET_P2P_COMMAND = "GetP2p"
 
 GET_NETWORK_PORT_COMMAND = "GetNetPort"
 
-CACHE_PORTS = "ports"
-CACHE_LINK = "link"
-
-_CACHE_NORTSP = "_no_get_rtsp"
-
-
-class _LocalCache(TypedDict):
-    ports: NetworkPorts
-    link: LinkInfo
-    token: str
-    _no_get_rtsp: bool
-
 
 class Network:
     """Network commands Mixin"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__cache: _LocalCache = (
-            getattr(self, "__cache") if hasattr(self, "__cache") else {}
-        )
-        setattr(self, "__cache", self.__cache)
-        if isinstance(self, Connection) and not hasattr(self, "_execute"):
-            # type "interface"
-            self._execute = self._execute
+        self.__link: LinkInfo | None = None
+        self.__ports: NetworkPorts | None = None
+        self.__no_get_rtsp = False
+        other: any = self
+        if isinstance(other, connection.Connection):
+            other._disconnect_callbacks.append(self.__clear)
+            if not hasattr(self, "_execute"):
+                self._execute = other._execute
+        if isinstance(other, security.Security) and not hasattr(self, "_auth_token"):
+            self._auth_token = other._auth_token
+
+    def __clear(self):
+        self.__no_get_rtsp = False
+        self.__link = None
+        self.__ports = None
 
     @staticmethod
     def create_get_local_link(
@@ -147,7 +143,7 @@ class Network:
     async def get_local_link(self):
         """Get Local Link"""
 
-        self.__cache.pop(CACHE_LINK, None)
+        self.__link = None
         link = next(
             _cast_local_link_response_value(
                 filter_command_responses(
@@ -158,7 +154,7 @@ class Network:
             None,
         )
         if link is not None:
-            self.__cache["link"] = link
+            self.__link = link
         return link
 
     @staticmethod
@@ -210,7 +206,7 @@ class Network:
     async def get_ports(self):
         """Get Network Ports Url"""
 
-        self.__cache.pop(CACHE_PORTS, None)
+        self.__ports = None
         ports = next(
             _cast_network_ports_response_value(
                 filter_command_responses(
@@ -221,30 +217,30 @@ class Network:
             None,
         )
         if ports is not None:
-            self.__cache["ports"] = ports
+            self.__ports = ports
         return ports
 
     async def _ensure_ports_and_link(self):
         commands = []
-        if CACHE_LINK not in self.__cache:
+        if self.__link is None:
             commands.append(Network.create_get_local_link())
-        if CACHE_PORTS not in self.__cache:
+        if self.__ports is None:
             commands.append(Network.create_get_network_ports())
 
         results = await self._execute(*commands) if len(commands) > 0 else []
         link = next(Network.get_local_link_responses(results))
         ports = next(Network.get_network_ports_responses(results))
         if link is not None:
-            self.__cache["link"] = link
+            self.__link = link
         if ports is not None:
-            self.__cache["ports"] = ports
+            self.__ports = ports
 
     async def get_rtsp_url(
         self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
     ):
         """Get RTSP Url"""
 
-        if _CACHE_NORTSP not in self.__cache:
+        if not self.__no_get_rtsp:
             results = await self._execute(
                 CommandRequest(
                     cmd=GET_RTSP_URL_COMMAND, action=CommandRequestTypes.VALUE_ONLY
@@ -258,19 +254,19 @@ class Network:
                 value: GetRTSPUrlCommandResponseValue = results[0]["value"]
                 return value["rtspUrl"]
 
-            self.__cache["_no_get_rtsp"] = True
+            self.__no_get_rtsp = True
 
         await self._ensure_ports_and_link()
 
         port = (
-            f':{self.__cache["ports"]["rtspPort"]}'
-            if self.__cache["ports"]["rtspPort"] not in (0, 554)
+            f':{self.__ports["rtspPort"]}'
+            if self.__ports["rtspPort"] not in (0, 554)
             else ""
         )
 
-        url = f'rtsp://{self.__cache["link"]["static"]["ip"]}{port}/h264Preview_{channel:02}_{stream.name.lower()}'
-        if CACHE_TOKEN in self.__cache:
-            return f"{url}&Token={quote_plus(self.__cache['token'])}"
+        url = f'rtsp://{self.__link["static"]["ip"]}{port}/h264Preview_{channel:02}_{stream.name.lower()}'
+        if self._auth_token:
+            return f"{url}&Token={quote_plus(self._auth_token)}"
         return url
 
     async def get_rtmp_url(
@@ -281,14 +277,14 @@ class Network:
         await self._ensure_ports_and_link()
 
         port = (
-            f':{self.__cache["ports"]["rtmpPort"]}'
-            if self.__cache["ports"]["rtmpPort"] not in (0, 1935)
+            f':{self.__ports["rtmpPort"]}'
+            if self.__ports["rtmpPort"] not in (0, 1935)
             else ""
         )
 
-        url = f'rtmp://{self.__cache["link"]["static"]["ip"]}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}'
-        if CACHE_TOKEN in self.__cache:
-            return f"{url}&Token={quote_plus(self.__cache['token'])}"
+        url = f'rtmp://{self.__link["static"]["ip"]}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}'
+        if self._auth_token != "":
+            return f"{url}&Token={quote_plus(self._auth_token)}"
         return url
 
     @staticmethod
