@@ -1,5 +1,6 @@
 """ Rest API client """
 
+from .led import LED
 from .network import Network
 from .connection import Connection, SessionFactory
 from .security import Security
@@ -13,7 +14,17 @@ from .ai import AI
 
 
 class Client(
-    Connection, Security, Encrypt, System, Network, Video, Encoding, Record, Alarm, AI
+    Connection,
+    Security,
+    Encrypt,
+    System,
+    Network,
+    Video,
+    Encoding,
+    Record,
+    Alarm,
+    AI,
+    LED,
 ):
     """Rest API Client"""
 

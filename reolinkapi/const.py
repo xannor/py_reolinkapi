@@ -17,3 +17,11 @@ class DetectionTypes(IntEnum):
     ANIMAL = 3
     PET = 4
     FACE = 5
+
+
+class LightTypes(IntEnum):
+    """Light Types"""
+
+    IR = 0
+    POWER = 1
+    WHITE = 1

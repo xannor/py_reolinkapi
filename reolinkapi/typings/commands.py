@@ -57,6 +57,12 @@ COMMAND_RESPONSE_VALUE: Final = "value"
 COMMAND_RESPONSE_VALUE_LITERAL: Final = Literal["value"]
 
 
+class CommandResponseCodeValue(TypedDict):
+    """Command Response Code Value"""
+
+    rspCode: int
+
+
 class ErrorCode(TypedDict):
     """Error Code"""
 

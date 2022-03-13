@@ -11,6 +11,7 @@ from ..typings.commands import (
     CommandRequestWithParam,
     COMMAND_REQUEST_PARAM,
     CommandResponse,
+    CommandResponseCodeValue,
     CommandResponseValue,
     COMMAND_RESPONSE_VALUE,
     CommandResponseErrorValue,
@@ -28,13 +29,17 @@ def isparam(request: CommandRequest) -> TypeGuard[CommandRequestWithParam]:
     )
 
 
-def create_param_has_key(key: str, __type: type[T]):
+def create_param_has_key(
+    key: str, __type: type[T], __class_or_tuple: type | tuple = dict
+):
     """Create Param Typeguard"""
 
     def _typeguard(
         request: CommandRequestWithParam,
     ) -> TypeGuard[Mapping[COMMAND_REQUEST_PARAM_LITERAL, T]]:
-        return key in request["param"] and isinstance(request["param"][key], dict)
+        return key in request["param"] and isinstance(
+            request["param"][key], __class_or_tuple
+        )
 
     return _typeguard
 
@@ -68,3 +73,6 @@ def create_value_has_key(
         )
 
     return _typeguard
+
+
+isresponse = create_value_has_key("rspCode", CommandResponseCodeValue, int)
