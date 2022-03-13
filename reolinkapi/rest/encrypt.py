@@ -9,12 +9,12 @@ from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers.algorithms import AES
 from cryptography.hazmat.primitives.ciphers.modes import CFB
 
-from reolinkapi.rest.typings.commands import CommandRequest, CommandRequestTypes
+from ..typings.commands import CommandRequestWithParam, CommandRequestTypes
 
 
 from . import connection, security
 
-from .typings.encrypt import DigestInfo
+from ..typings.encrypt import DigestInfo
 
 
 class EncryptionLoginRequestParam(TypedDict):
@@ -36,16 +36,21 @@ class Encrypt:
     """Encryption Mixin"""
 
     def __init__(self, *args, **kwargs):
+        self._can_encrypt = True
         super().__init__(*args, **kwargs)
         self.__cipher: Cipher | None = None
         other: any = self
         if isinstance(other, connection.Connection):
+            other._disconnect_callbacks.append(self.__cleanup_dc)
             if not hasattr(self, "_execute_request"):
                 self._execute_request = other._execute_request
                 self._process_response = other._process_response
 
         if isinstance(other, security.Security):
             other._logout_callbacks.append(self.__cleanup)
+
+    def __cleanup_dc(self):
+        self._can_encrypt = True
 
     def __cleanup(self):
         self.__cipher = None
@@ -73,15 +78,16 @@ class Encrypt:
 
     async def _encrypted_login(self, username: str, password: str):
         response = await self._execute_request(
-            CommandRequest(
+            CommandRequestWithParam(
                 cmd=security.LOGIN_COMMAND,
                 action=CommandRequestTypes.VALUE_ONLY,
                 param=EncryptionLoginRequestParam(Version=1),
             )
         )
         if response is None:
+            self._can_encrypt = False
             return None
-        auth = response[0].headers.get("WWW-Authenticate")
+        auth = response.headers.get("WWW-Authenticate")
         _comma = (
             (pair.strip() for pair in auth[7:].split(","))
             if auth is not None and auth[0:7] == "Digest "
@@ -97,16 +103,17 @@ class Encrypt:
         )
         auth = dict(_clean) if _clean is not None else None
         if auth is None:
+            self._can_encrypt = False
             return None
 
         digest = cast(DigestInfo, dict())
-        digest["Uri"] = response[0].url.path_qs[1:]
-        response[0].close()
+        digest["Uri"] = response.url.path_qs[1:]
+        response.close()
         digest["Realm"] = auth["realm"]
         digest["Qop"] = auth["qop"]
         digest["Nonce"] = auth["nonce"]
         digest["Nc"] = auth["nc"]
-        digest["Method"] = response[0].method
+        digest["Method"] = response.method
 
         digest["Cnonce"] = SystemRandom().randbytes(24).hex()
 
@@ -131,11 +138,11 @@ class Encrypt:
         )
 
         response = await self._execute_request(
-            CommandRequest(
+            CommandRequestWithParam(
                 cmd=security.LOGIN_COMMAND,
                 action=CommandRequestTypes.VALUE_ONLY,
                 param=EncrtypedLoginRequestParam(Version=1, Digest=digest),
             )
         )
         self._create_cipher(key)
-        return await self._process_response(*response)
+        return await self._process_response(response)

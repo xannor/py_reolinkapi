@@ -8,9 +8,13 @@ from .system import System
 from .video import Video
 from .encoding import Encoding
 from .record import Record
+from .alarm import Alarm
+from .ai import AI
 
 
-class Client(Connection, Security, Encrypt, System, Network, Video, Encoding, Record):
+class Client(
+    Connection, Security, Encrypt, System, Network, Video, Encoding, Record, Alarm, AI
+):
     """Rest API Client"""
 
     def __init__(self, session_factory: SessionFactory = None) -> None:

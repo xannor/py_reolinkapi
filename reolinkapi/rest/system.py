@@ -3,31 +3,23 @@ from __future__ import annotations
 
 from typing import Iterable, TypedDict
 
-from .typings.commands import (
-    CommandRequest,
+from ..typings.commands import (
+    CommandRequestWithParam,
     CommandRequestTypes,
     CommandResponse,
-    filter_command_responses,
 )
 
-from .typings.abilities import Abilities
-from .typings.system import DeviceInfo, UserInfo
+from ..typings.abilities import Abilities
+from ..typings.system import DeviceInfo, UserInfo
 
 from . import connection
+from ..helpers import commands as commandHelpers
 
 
 class GetAbilityResponseValue(TypedDict):
     """Get Abilities Resposne Value"""
 
     Ability: Abilities
-
-
-def _cast_ability_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetAbilityResponseValue = response["value"]
-        return value["Ability"]
-
-    return map(_cast, responses)
 
 
 class UserInfoRequestParameter(TypedDict):
@@ -38,6 +30,24 @@ class UserInfoRequestParameter(TypedDict):
 
 GET_ABILITY_COMMAND = "GetAbility"
 
+_isAbilities = commandHelpers.create_value_has_key("Ability", GetAbilityResponseValue)
+
+
+def _get_ability_responses(responses: Iterable[CommandResponse]):
+
+    return map(
+        lambda response: response["value"]["Ability"],
+        filter(
+            _isAbilities,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_ABILITY_COMMAND, responses
+                ),
+            ),
+        ),
+    )
+
 
 class GetDeviceInfoResponseValue(TypedDict):
     """Get Device Info Response Value"""
@@ -45,15 +55,25 @@ class GetDeviceInfoResponseValue(TypedDict):
     DevInfo: DeviceInfo
 
 
-def _cast_device_info_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetDeviceInfoResponseValue = response["value"]
-        return value["DevInfo"]
-
-    return map(_cast, responses)
-
-
 DEVICE_INFO_COMMAND = "GetDevInfo"
+
+_isDevInfo = commandHelpers.create_value_has_key("DevInfo", GetDeviceInfoResponseValue)
+
+
+def _get_devinfo_responses(responses: Iterable[CommandResponse]):
+
+    return map(
+        lambda response: response["value"]["DevInfo"],
+        filter(
+            _isDevInfo,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == DEVICE_INFO_COMMAND, responses
+                ),
+            ),
+        ),
+    )
 
 
 class System:
@@ -72,7 +92,7 @@ class System:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create GetAbility Request"""
-        return CommandRequest(
+        return CommandRequestWithParam(
             cmd=GET_ABILITY_COMMAND,
             action=_type,
             param=UserInfoRequestParameter(User=UserInfo(userName=username or "null")),
@@ -82,48 +102,38 @@ class System:
     def get_ability_responses(responses: Iterable[CommandResponse]):
         """Get GetAbility Responses"""
 
-        return _cast_ability_response_value(
-            filter_command_responses(GET_ABILITY_COMMAND, responses)
-        )
+        return _get_ability_responses(responses)
 
     async def get_ability(self, username: str | None = None):
         """Get User Permisions"""
 
-        abilities = next(
-            _cast_ability_response_value(
-                filter_command_responses(
-                    GET_ABILITY_COMMAND,
-                    await self._execute(System.create_get_ability(username)),
-                )
+        value = next(
+            _get_ability_responses(
+                await self._execute(System.create_get_ability(username)),
             ),
             None,
         )
-        return abilities
+        return value
 
     @staticmethod
     def create_get_device_info(
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create DeviceInfo Request"""
-        return CommandRequest(cmd=DEVICE_INFO_COMMAND, action=_type)
+        return CommandRequestWithParam(cmd=DEVICE_INFO_COMMAND, action=_type)
 
     @staticmethod
     def get_device_info_responses(responses: Iterable[CommandResponse]):
         """Get DeviceInfo Responses"""
 
-        return _cast_device_info_response_value(
-            filter_command_responses(DEVICE_INFO_COMMAND, responses)
-        )
+        return _get_devinfo_responses(responses)
 
     async def get_device_info(self):
         """Get Device Information"""
 
         devinfo = next(
-            _cast_device_info_response_value(
-                filter_command_responses(
-                    DEVICE_INFO_COMMAND,
-                    await self._execute(System.create_get_device_info()),
-                )
+            _get_devinfo_responses(
+                await self._execute(System.create_get_device_info()),
             ),
             None,
         )

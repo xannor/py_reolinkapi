@@ -12,7 +12,7 @@ class LinkType(Enum):
     DHCP = "DHCP"
 
 
-class IPInfo(TypedDict):
+class IPInfo(TypedDict, total=False):
     """IP Information"""
 
     gateway: str
@@ -20,7 +20,7 @@ class IPInfo(TypedDict):
     mask: str
 
 
-class LinkInfo(TypedDict):
+class LinkInfo(TypedDict, total=False):
     """Link Information"""
 
     activeLink: str
@@ -29,7 +29,7 @@ class LinkInfo(TypedDict):
     static: IPInfo
 
 
-class ChannelStatus(TypedDict):
+class ChannelStatus(TypedDict, total=False):
     """Channel Status"""
 
     channel: int
@@ -38,7 +38,7 @@ class ChannelStatus(TypedDict):
     typeInfo: str
 
 
-class RTSPUrls(TypedDict):
+class RTSPUrls(TypedDict, total=False):
     """RTSP Url Info"""
 
     channel: int
@@ -47,7 +47,7 @@ class RTSPUrls(TypedDict):
     extStream: str
 
 
-class NetworkPorts(TypedDict):
+class NetworkPorts(TypedDict, total=False):
     """Network Ports"""
 
     httpEnable: bool
@@ -64,7 +64,7 @@ class NetworkPorts(TypedDict):
     rtspPort: int
 
 
-class P2PInfo(TypedDict):
+class P2PInfo(TypedDict, total=False):
     """P2P Info"""
 
     enable: bool

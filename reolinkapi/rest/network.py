@@ -2,20 +2,20 @@
 from __future__ import annotations
 
 
-from typing import Iterable, TypedDict
+from typing import Final, Iterable, TypedDict
 from urllib.parse import quote_plus
 
 from . import connection, security
 
-from .typings.commands import (
-    CommandRequest,
+from ..typings.commands import (
+    CommandRequestWithParam,
     CommandRequestTypes,
     CommandResponse,
-    filter_command_responses,
 )
-from .typings.network import ChannelStatus, LinkInfo, NetworkPorts, P2PInfo, RTSPUrls
+from ..typings.network import ChannelStatus, LinkInfo, NetworkPorts, P2PInfo, RTSPUrls
 
 from .const import StreamTypes
+from ..helpers import commands as commandHelpers
 
 
 class GetLocalLinkResponseValue(TypedDict):
@@ -24,15 +24,27 @@ class GetLocalLinkResponseValue(TypedDict):
     LocalLink: LinkInfo
 
 
-def _cast_local_link_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetLocalLinkResponseValue = response["value"]
-        return value["LocalLink"]
+GET_LOCAL_LINK_COMMAND: Final = "GetLocalLink"
 
-    return map(_cast, responses)
+_isLocalLink = commandHelpers.create_value_has_key(
+    "LocalLink", GetLocalLinkResponseValue
+)
 
 
-GET_LOCAL_LINK_COMMAND = "GetLocalLink"
+def _get_local_link_responses(responses: Iterable[CommandResponse]):
+    return map(
+        lambda response: response["value"]["LocalLink"],
+        filter(
+            _isLocalLink,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_LOCAL_LINK_COMMAND,
+                    responses,
+                ),
+            ),
+        ),
+    )
 
 
 class GetChannelStatusResponseValue(TypedDict):
@@ -42,15 +54,27 @@ class GetChannelStatusResponseValue(TypedDict):
     status: list[ChannelStatus]
 
 
-def _cast_channel_status_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetChannelStatusResponseValue = response["value"]
-        return value
+GET_CHANNEL_STATUS_COMMAND: Final = "GetChannelstatus"
 
-    return map(_cast, responses)
+_isChannelStatus = commandHelpers.create_value_has_key(
+    "status", GetChannelStatusResponseValue, list
+)
 
 
-GET_CHANNEL_STATUS_COMMAND = "GetChannelstatus"
+def _get_channel_status_responses(responses: Iterable[CommandResponse]):
+    return map(
+        lambda response: response["value"],
+        filter(
+            _isChannelStatus,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_CHANNEL_STATUS_COMMAND,
+                    responses,
+                ),
+            ),
+        ),
+    )
 
 
 class GetRTSPUrlCommandResponseValue(TypedDict):
@@ -59,15 +83,27 @@ class GetRTSPUrlCommandResponseValue(TypedDict):
     rtspUrl: RTSPUrls
 
 
-def _cast_rtsp_url_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetRTSPUrlCommandResponseValue = response["value"]
-        return value["rtspUrl"]
+GET_RTSP_URL_COMMAND: Final = "GetRtspUrl"
 
-    return map(_cast, responses)
+_isRTSPUrl = commandHelpers.create_value_has_key(
+    "rtspUrl", GetRTSPUrlCommandResponseValue
+)
 
 
-GET_RTSP_URL_COMMAND = "GetRtspUrl"
+def _get_rtsp_url_responses(responses: Iterable[CommandResponse]):
+    return map(
+        lambda response: response["value"]["rtspUrl"],
+        filter(
+            _isRTSPUrl,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_RTSP_URL_COMMAND,
+                    responses,
+                ),
+            ),
+        ),
+    )
 
 
 class GetNetworkPortsCommandResponseValue(TypedDict):
@@ -76,12 +112,27 @@ class GetNetworkPortsCommandResponseValue(TypedDict):
     NetPort: NetworkPorts
 
 
-def _cast_network_ports_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetNetworkPortsCommandResponseValue = response["value"]
-        return value["NetPort"]
+GET_NETWORK_PORT_COMMAND: Final = "GetNetPort"
 
-    return map(_cast, responses)
+_isNetworkPorts = commandHelpers.create_value_has_key(
+    "NetPort", GetNetworkPortsCommandResponseValue
+)
+
+
+def _get_network_port_responses(responses: Iterable[CommandResponse]):
+    return map(
+        lambda response: response["value"]["NetPort"],
+        filter(
+            _isNetworkPorts,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_NETWORK_PORT_COMMAND,
+                    responses,
+                ),
+            ),
+        ),
+    )
 
 
 class GetP2PResponseValue(TypedDict):
@@ -90,18 +141,25 @@ class GetP2PResponseValue(TypedDict):
     P2p: P2PInfo
 
 
-def _cast_p2p_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetP2PResponseValue = response["value"]
-        return value["P2p"]
+GET_P2P_COMMAND: Final = "GetP2p"
 
-    return map(_cast, responses)
+_isP2P = commandHelpers.create_value_has_key("P2p", GetP2PResponseValue)
 
 
-GET_P2P_COMMAND = "GetP2p"
-
-
-GET_NETWORK_PORT_COMMAND = "GetNetPort"
+def _get_p2p_responses(responses: Iterable[CommandResponse]):
+    return map(
+        lambda response: response["value"]["P2p"],
+        filter(
+            _isP2P,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_P2P_COMMAND,
+                    responses,
+                ),
+            ),
+        ),
+    )
 
 
 class Network:
@@ -130,26 +188,21 @@ class Network:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create LocalLink Request"""
-        return CommandRequest(cmd=GET_LOCAL_LINK_COMMAND, action=_type)
+        return CommandRequestWithParam(cmd=GET_LOCAL_LINK_COMMAND, action=_type)
 
     @staticmethod
     def get_local_link_responses(responses: Iterable[CommandResponse]):
         """Get LocalLink Responses"""
 
-        return _cast_local_link_response_value(
-            filter_command_responses(GET_LOCAL_LINK_COMMAND, responses)
-        )
+        return _get_local_link_responses(responses)
 
     async def get_local_link(self):
         """Get Local Link"""
 
         self.__link = None
         link = next(
-            _cast_local_link_response_value(
-                filter_command_responses(
-                    GET_LOCAL_LINK_COMMAND,
-                    await self._execute(Network.create_get_local_link()),
-                )
+            _get_local_link_responses(
+                await self._execute(Network.create_get_local_link())
             ),
             None,
         )
@@ -162,25 +215,20 @@ class Network:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create GetChannelStatus Request"""
-        return CommandRequest(cmd=GET_CHANNEL_STATUS_COMMAND, action=_type)
+        return CommandRequestWithParam(cmd=GET_CHANNEL_STATUS_COMMAND, action=_type)
 
     @staticmethod
     def get_channel_status_responses(responses: Iterable[CommandResponse]):
         """Get ChannelStatus[] Responses"""
 
-        return _cast_channel_status_response_value(
-            filter_command_responses(GET_CHANNEL_STATUS_COMMAND, responses)
-        )
+        return _get_channel_status_responses(responses)
 
     async def get_channel_status(self):
         """Get Channel Statuses Link"""
 
         status = next(
-            _cast_channel_status_response_value(
-                filter_command_responses(
-                    GET_CHANNEL_STATUS_COMMAND,
-                    await self._execute(Network.create_get_channel_status()),
-                )
+            _get_channel_status_responses(
+                await self._execute(Network.create_get_channel_status()),
             ),
             None,
         )
@@ -193,26 +241,21 @@ class Network:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create GetNetworkProts Request"""
-        return CommandRequest(cmd=GET_NETWORK_PORT_COMMAND, action=_type)
+        return CommandRequestWithParam(cmd=GET_NETWORK_PORT_COMMAND, action=_type)
 
     @staticmethod
     def get_network_ports_responses(responses: Iterable[CommandResponse]):
         """Get NetworkPorts Responses"""
 
-        return _cast_network_ports_response_value(
-            filter_command_responses(GET_NETWORK_PORT_COMMAND, responses)
-        )
+        return _get_network_port_responses(responses)
 
     async def get_ports(self):
         """Get Network Ports Url"""
 
         self.__ports = None
         ports = next(
-            _cast_network_ports_response_value(
-                filter_command_responses(
-                    GET_NETWORK_PORT_COMMAND,
-                    await self._execute(Network.create_get_network_ports()),
-                )
+            _get_network_port_responses(
+                await self._execute(Network.create_get_network_ports()),
             ),
             None,
         )
@@ -242,17 +285,20 @@ class Network:
 
         if not self.__no_get_rtsp:
             results = await self._execute(
-                CommandRequest(
+                CommandRequestWithParam(
                     cmd=GET_RTSP_URL_COMMAND, action=CommandRequestTypes.VALUE_ONLY
                 )
             )
-            if (
-                len(results) == 1
-                and isinstance(results[0], dict)
-                and results[0]["cmd"] == GET_RTSP_URL_COMMAND
-            ):
-                value: GetRTSPUrlCommandResponseValue = results[0]["value"]
-                return value["rtspUrl"]
+            if len(results) == 1:
+                result = results[0]
+                if (
+                    commandHelpers.isvalue(result)
+                    and result["cmd"] == GET_RTSP_URL_COMMAND
+                    and _isRTSPUrl(result)
+                ):
+                    result = result["value"]["rtspUrl"]
+                    url: str = result[f"{stream.name.lower()}Stream"]
+                    return url
 
             self.__no_get_rtsp = True
 
@@ -292,25 +338,20 @@ class Network:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create LocalLink Request"""
-        return CommandRequest(cmd=GET_P2P_COMMAND, action=_type)
+        return CommandRequestWithParam(cmd=GET_P2P_COMMAND, action=_type)
 
     @staticmethod
     def get_p2p_responses(responses: Iterable[CommandResponse]):
         """Get LocalLink Responses"""
 
-        return _cast_p2p_response_value(
-            filter_command_responses(GET_P2P_COMMAND, responses)
-        )
+        return _get_p2p_responses(responses)
 
     async def get_p2p(self):
         """Get P2P"""
 
         return next(
-            _cast_p2p_response_value(
-                filter_command_responses(
-                    GET_P2P_COMMAND,
-                    await self._execute(Network.create_get_p2p()),
-                )
+            _get_p2p_responses(
+                await self._execute(Network.create_get_p2p()),
             ),
             None,
         )

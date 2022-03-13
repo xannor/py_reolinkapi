@@ -3,18 +3,19 @@ from __future__ import annotations
 
 
 import asyncio
+from enum import IntEnum
 import inspect
 import json
 import logging
 from typing import Callable, Iterable, Protocol
 import aiohttp
 
+from reolinkapi.helpers.commands import isparam, iserror
+
 from ..exceptions import (
-    InvalidCredentialsError,
     InvalidResponseError,
-    ReolinkError,
 )
-from .typings.commands import CommandRequest, CommandResponse
+from ..typings.commands import CommandRequest, CommandResponse
 
 from . import security, encrypt
 
@@ -39,8 +40,12 @@ def _default_create_session(base_url: str, timeout: int):
     )
 
 
-CACHE_CONNECTION_ID = "connection_id"
-CACHE_URL = "url"
+class Encryption(IntEnum):
+    """Connection Encryption"""
+
+    NONE = 0
+    HTTPS = 1
+    AES = 2
 
 
 class Connection:
@@ -56,15 +61,17 @@ class Connection:
         self.__base_url = ""
         self.__hostname = ""
         self.__connection_id = 0
-        self._https = False
         other: any = self
         if isinstance(other, security.Security) and not hasattr(self, "_auth_token"):
             self._auth_token = other._auth_token
-        if isinstance(other, encrypt.Encrypt):
-            self.__can_encrypt = True
-            if not hasattr(self, "encrypt"):
-                self._encrypt = other._encrypt
-                self._decrypt = other._decrypt
+            self._has_auth_failure = other._has_auth_failure
+            self.logout = other.logout
+        if isinstance(other, encrypt.Encrypt) and not hasattr(self, "encrypt"):
+            self._can_encrypt = other._can_encrypt
+            self._encrypt = other._encrypt
+            self._decrypt = other._decrypt
+        elif not hasattr(self, "_can_encrypt"):
+            self._can_encrypt = False
 
     def _create_session(self, timeout: int):
         return self.__session_factory(self.__base_url, timeout)
@@ -90,17 +97,23 @@ class Connection:
         port: int = None,
         timeout: float = DEFAULT_TIMEOUT,
         *,
-        https: bool = None,
+        encryption: Encryption = Encryption.NONE,
     ):
         """
         setup connection to device
+
+        full_encrypt will enable a basic cleartext encryption on all
+        requests, otherwise only login will be encrypted (if supported)
+        This is ignored if https is used
         """
-        if port == 443 or (port is None and https):
+        if port == 443 or (port is None and encryption == Encryption.HTTPS):
             https = True
             port = None
-        elif port == 80 and https is not True:
+        elif port == 80 and encrypt != Encryption.HTTPS:
             https = False
             port = None
+        else:
+            https = encryption == Encryption.HTTPS
         scheme = "https" if https is True else "http"
         _port = f":{port}" if port is not None else ""
         url = f"{scheme}://{hostname}{_port}"
@@ -112,7 +125,8 @@ class Connection:
         self.__base_url = url
         self.__connection_id = _id
         self.__hostname = hostname
-        self._https = https
+        if https or encryption != Encryption.AES:
+            self._can_encrypt = False
         if self.__session is None or self.__session.closed:
             self.__session = self._create_session(timeout)
 
@@ -131,7 +145,6 @@ class Connection:
         self.__connection_id = 0
         self.__base_url = ""
         self.__hostname = ""
-        self._https = False
         self.__session = None
 
     def _ensure_connection(self):
@@ -158,9 +171,13 @@ class Connection:
         headers = {"accept": "application/json"}
 
         cleanup = True
+        response = None
+        context = None
         try:
+            encrypted = False
             if use_get:
-                query.update(args[0]["param"])
+                if isparam(args[0]):
+                    query.update(args[0]["param"])
                 _LOGGER.debug("GET: %s?%s", self.__hostname, query)
                 context = self.__session.get(
                     "/cgi-bin/api.cgi",
@@ -170,15 +187,20 @@ class Connection:
                 )
             else:
                 data = self.__session.json_serialize(args)
+                if self._can_encrypt:
+                    edata = self._encrypt(data)
+                    encrypted = data != edata
+                    if encrypted:
+                        query.pop("cmd", None)
+                else:
+                    edata = data
+
                 _LOGGER.debug("POST: %s?%s", self.__hostname, query)
-                _LOGGER_DATA.debug("<-%s", data)
-                if self.__can_encrypt and not self._https:
-                    data = self._encrypt(data)
-                    encrypted = True
+                _LOGGER_DATA.debug("%s<-%s", "E" if encrypted else "", data)
                 context = self.__session.post(
                     "/cgi-bin/api.cgi",
                     params=query,
-                    data=data,
+                    data=edata,
                     headers=headers,
                     allow_redirects=False,
                 )
@@ -186,38 +208,57 @@ class Connection:
             response = await context
             if response.status >= 500:
                 _LOGGER.error("got critical (%d) response code", response.status)
-                raise InvalidResponseError()
+                raise aiohttp.ClientResponseError(
+                    response.request_info,
+                    [response],
+                    status=response.status,
+                    headers=response.headers,
+                )
             if response.status >= 400:
                 _LOGGER.error("got auth (%d) response code", response.status)
-                raise InvalidCredentialsError()
+                raise aiohttp.ClientResponseError(
+                    response.request_info,
+                    [response],
+                    status=response.status,
+                    headers=response.headers,
+                )
 
             cleanup = False
-            return (response, bool(encrypted))
+
+            return response
         except aiohttp.ClientConnectorError as http_error:
             _LOGGER.error("connection error (%s)", http_error)
-            raise ReolinkError(http_error) from None
+            raise
         except asyncio.TimeoutError:
             _LOGGER.error("timeout")
             raise
-        except Exception as _e:
-            _LOGGER.error("Unhnandled exception (%s)", _e)
-            raise ReolinkError(_e) from None
         finally:
             if cleanup:
                 if response is not None:
                     response.close()
-                context.close()
+                if context is not None:
+                    context.close()
+
+    @staticmethod
+    def get_error_responses(responses: Iterable[CommandResponse]):
+        """Get LocalLink Responses"""
+
+        return filter(iserror, responses)
 
     async def _process_response(
-        self, response: aiohttp.ClientResponse, encrypted: bool = False
+        self, response: aiohttp.ClientResponse
     ) -> list[CommandResponse]:
         if response is None:
             return []
 
         try:
             data = await response.text()
-            if self.__can_encrypt and encrypted and data[0] != "[":
-                data = self._decrypt(data)
+            decrypted = False
+            if self._can_encrypt and data[0] != "[":
+                ddata = self._decrypt(data)
+                decrypted = data != ddata
+                if decrypted:
+                    data = ddata
 
             if data[0] != "[":
                 _LOGGER.error("did not get json as response: (%s)", data)
@@ -231,13 +272,17 @@ class Connection:
 
         if not isinstance(data, list):
             data = [data]
-        _LOGGER_DATA.debug("->%s", data)
+        _LOGGER_DATA.debug("%s->%s", "D" if decrypted else "", data)
+
+        if self._auth_token != None and self._has_auth_failure(data):
+            await self.logout()
+
         return data
 
     async def _execute(self, *args: CommandRequest, use_get: bool = False):
         """Internal API"""
         return await self._process_response(
-            *(await self._execute_request(*args, use_get=use_get))
+            await self._execute_request(*args, use_get=use_get)
         )
 
     async def batch(self, commands: Iterable[CommandRequest]):

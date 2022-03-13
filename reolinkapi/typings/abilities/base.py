@@ -1,7 +1,7 @@
 """System Abilities Typings"""
 
 from enum import IntEnum, IntFlag
-from typing import TypedDict
+from typing import Annotated, TypedDict
 
 
 class Permissions(IntFlag):
@@ -32,7 +32,4 @@ class Ability(TypedDict):
     """Ability"""
 
     ver: int
-    """value 'supported'
-    hint: eg BooleanAbilityVers"""
-    permit: int
-    """hint: Permissions"""
+    permit: Annotated[int, Permissions]

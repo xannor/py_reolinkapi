@@ -6,7 +6,7 @@ import os
 from reolinkapi.rest import Client
 
 from reolinkapi.rest.encrypt import Encrypt
-from reolinkapi.rest.typings.commands import CommandRequest
+from reolinkapi.typings.commands import CommandRequestWithParam
 from reolinkapi.rest.security import LOGIN_COMMAND
 from reolinkapi.const import DEFAULT_USERNAME, DEFAULT_PASSWORD
 
@@ -42,7 +42,7 @@ class EncryptTestRig(Encrypt):
     """Encryp mixin test rig"""
 
     async def _execute_request(
-        self, *args: CommandRequest, use_get: bool = False
+        self, *args: CommandRequestWithParam, use_get: bool = False
     ):  # pylint: disable=method-hidden
         _j = json.dumps(args)
 

@@ -1,16 +1,16 @@
 """ Encoding Commands """
 from __future__ import annotations
-from typing import Iterable, TypedDict
+from typing import Final, Iterable, TypedDict
 
-from .typings.commands import (
+from ..typings.commands import (
     CommandChannelParameter,
-    CommandRequest,
+    CommandRequestWithParam,
     CommandRequestTypes,
     CommandResponse,
-    filter_command_responses,
 )
 
-from .typings.encoding import EncodingInfo
+from ..typings.encoding import EncodingInfo
+from ..helpers import commands as commandHelpers
 
 from . import connection
 
@@ -21,15 +21,25 @@ class GetEncodingResponseValue(TypedDict):
     Enc: EncodingInfo
 
 
-def _cast_encoding_response_value(responses: Iterable[CommandResponse]):
-    def _cast(response: CommandResponse):
-        value: GetEncodingResponseValue = response["value"]
-        return value["Enc"]
+GET_ENCODING_COMMAND: Final = "GetEnc"
 
-    return map(_cast, responses)
+_isEncoding = commandHelpers.create_value_has_key("Enc", GetEncodingResponseValue)
 
 
-GET_ENCODING_COMMAND = "GetEnc"
+def _get_encoding_responses(responses: Iterable[CommandResponse]):
+
+    return map(
+        lambda response: response["value"]["Enc"],
+        filter(
+            _isEncoding,
+            filter(
+                commandHelpers.isvalue,
+                filter(
+                    lambda response: response["cmd"] == GET_ENCODING_COMMAND, responses
+                ),
+            ),
+        ),
+    )
 
 
 class Encoding:
@@ -48,7 +58,7 @@ class Encoding:
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create Encoding Request"""
-        return CommandRequest(
+        return CommandRequestWithParam(
             cmd=GET_ENCODING_COMMAND,
             action=_type,
             param=CommandChannelParameter(channel=channel),
@@ -58,20 +68,15 @@ class Encoding:
     def get_encoding_responses(responses: Iterable[CommandResponse]):
         """Get Encoding Responses"""
 
-        return _cast_encoding_response_value(
-            filter_command_responses(GET_ENCODING_COMMAND, responses)
-        )
+        return _get_encoding_responses(responses)
 
     async def get_encoding(self, channel: int = 0):
         """Get Encoding Info"""
 
-        devinfo = next(
-            _cast_encoding_response_value(
-                filter_command_responses(
-                    GET_ENCODING_COMMAND,
-                    await self._execute(Encoding.create_get_encoding(channel)),
-                )
+        encoding = next(
+            _get_encoding_responses(
+                await self._execute(Encoding.create_get_encoding(channel))
             ),
             None,
         )
-        return devinfo
+        return encoding

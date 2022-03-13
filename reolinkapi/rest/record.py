@@ -2,11 +2,12 @@
 
 import random
 import string
+from typing import Final
 
 from . import connection
 
-from .typings.commands import (
-    CommandRequest,
+from ..typings.commands import (
+    CommandRequestWithParam,
     CommandChannelParameter,
     CommandRequestTypes,
 )
@@ -22,7 +23,7 @@ class SnapshotRequestParameter(CommandChannelParameter):
     rs: str
 
 
-SNAPSHOT_COMMAND = "Snap"
+SNAPSHOT_COMMAND: Final = "Snap"
 
 
 class Record:
@@ -41,7 +42,7 @@ class Record:
 
         seed = "".join(_rnd.choice(_RND_SET) for _ in range(16))
         response = await self._execute_request(
-            CommandRequest(
+            CommandRequestWithParam(
                 cmd=SNAPSHOT_COMMAND,
                 action=CommandRequestTypes.VALUE_ONLY,
                 param=SnapshotRequestParameter(channel=channel, rs=seed),
@@ -52,6 +53,6 @@ class Record:
             return None
 
         try:
-            return await response[0].read()
+            return await response.read()
         finally:
-            response[0].close()
+            response.close()

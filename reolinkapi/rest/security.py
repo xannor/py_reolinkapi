@@ -3,19 +3,22 @@ from __future__ import annotations
 import inspect
 
 import time
-from typing import Callable, TypedDict
+from typing import Callable, Final, Iterable, TypedDict
+
+from git import CommandError
 
 from . import connection, encrypt
 
-from .typings.commands import (
-    CommandRequest,
+from ..typings.commands import (
     CommandRequestTypes,
-    CommandResponseErrorValue,
+    CommandRequestWithParam,
+    CommandResponse,
 )
 
-from .typings.security import LoginInfo, LoginToken
+from ..typings.security import LoginInfo, LoginToken
+from ..helpers import commands as commandHelpers
 
-from .exceptions import ErrorCodes, CommandError
+from .exceptions import ErrorCodes
 
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 
@@ -26,15 +29,18 @@ class LoginResponseValue(TypedDict):
     Token: LoginToken
 
 
+_istoken = commandHelpers.create_value_has_key("Token", LoginResponseValue)
+
+
 class LoginRequestCommandParameter(TypedDict):
     """Login Request Command Parameter"""
 
     User: LoginInfo
 
 
-LOGIN_COMMAND = "Login"
+LOGIN_COMMAND: Final = "Login"
 
-LOGOUT_COMMAND = "Logout"
+LOGOUT_COMMAND: Final = "Logout"
 
 
 class Security:
@@ -52,11 +58,11 @@ class Security:
             if not hasattr(self, "_execute"):
                 self._execute = other._execute
                 self._ensure_connection = other._ensure_connection
-                self._https = other._https
-        if isinstance(other, encrypt.Encrypt):
-            self.__can_encrypt = True
-            if not hasattr(self, "_encrypted_login"):
-                self._encrypted_login = other._encrypted_login
+        if isinstance(other, encrypt.Encrypt) and not hasattr(self, "_encrypted_login"):
+            self._can_encrypt = other._can_encrypt
+            self._encrypted_login = other._encrypted_login
+        elif not hasattr(self, "_can_encrypt"):
+            self._can_encrypt = False
 
     @property
     def authenticated(self):
@@ -78,6 +84,34 @@ class Security:
         """authentication id"""
         return self.__last_pwd_hash
 
+    def _has_auth_failure(self, responses: Iterable[CommandResponse]):
+        return (
+            next(
+                (
+                    error
+                    for error in filter(commandHelpers.iserror, responses)
+                    if error["error"]["rspCode"] in ErrorCodes.AUTH_REQUIRED
+                ),
+                None,
+            )
+            is not None
+        )
+
+    @staticmethod
+    def has_auth_failure(responses: Iterable[CommandResponse]):
+        """check responses for auth failure"""
+        return (
+            next(
+                (
+                    error
+                    for error in filter(commandHelpers.iserror, responses)
+                    if error["error"]["rspCode"] == ErrorCodes.AUTH_REQUIRED
+                ),
+                None,
+            )
+            is not None
+        )
+
     async def login(
         self, username: str = DEFAULT_USERNAME, password: str = DEFAULT_PASSWORD
     ) -> bool:
@@ -92,11 +126,13 @@ class Security:
         if not self._ensure_connection():
             return False
 
-        if self.__can_encrypt and not self._https:
+        if self._can_encrypt:
             results = await self._encrypted_login(username, password)
         else:
+            results = None
+        if results is None:
             results = await self._execute(
-                CommandRequest(
+                CommandRequestWithParam(
                     cmd=LOGIN_COMMAND,
                     action=CommandRequestTypes.VALUE_ONLY,
                     param=LoginRequestCommandParameter(
@@ -110,15 +146,16 @@ class Security:
             or results[0]["cmd"] != LOGIN_COMMAND
         ):
             return False
-        if "error" in results[0]:
-            result: CommandResponseErrorValue = results[0]
-            if result["error"]["rspCode"] == ErrorCodes.LOGIN_FAILED:
-                return False
+        result = results[0]
+
+        if not commandHelpers.isvalue(result) or not _istoken(result):
+            if commandHelpers.iserror(result):
+                if result["error"]["rspCode"] == ErrorCodes.LOGIN_FAILED:
+                    return False
             raise CommandError(result)
 
-        value: LoginResponseValue = results[0]["value"]
-        self.__token = value["Token"]["name"]
-        self.__token_expires = time.time() + value["Token"]["leaseTime"]
+        self.__token = result["value"]["Token"]["name"]
+        self.__token_expires = time.time() + result["value"]["Token"]["leaseTime"]
 
         return True
 
@@ -128,7 +165,7 @@ class Security:
         if self.authenticated:
             if self._ensure_connection():
                 results = await self._execute(
-                    CommandRequest(
+                    CommandRequestWithParam(
                         cmd=LOGOUT_COMMAND, action=CommandRequestTypes.VALUE_ONLY
                     )
                 )
