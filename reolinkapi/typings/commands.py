@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from typing import Final, Literal, TypedDict
+from typing_extensions import NotRequired
 
 
 class CommandRequestTypes(IntEnum):
@@ -51,6 +52,8 @@ class CommandResponseValue(CommandResponse):
     """Comand Response Value"""
 
     value: dict
+    initial: NotRequired[dict]
+    range: NotRequired[dict]
 
 
 COMMAND_RESPONSE_VALUE: Final = "value"

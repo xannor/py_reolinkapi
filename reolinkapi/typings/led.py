@@ -1,7 +1,16 @@
 """Led Typings"""
 
 
+from enum import Enum
 from typing import TypedDict
+
+
+class LightStates(str, Enum):
+    """Light States"""
+
+    AUTO = "Auto"
+    ON = "On"
+    OFF = "Off"
 
 
 class LightState(TypedDict, total=False):

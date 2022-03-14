@@ -90,7 +90,7 @@ class Security:
                 (
                     error
                     for error in filter(commandHelpers.iserror, responses)
-                    if error["error"]["rspCode"] in ErrorCodes.AUTH_REQUIRED
+                    if error["error"]["rspCode"] == ErrorCodes.AUTH_REQUIRED
                 ),
                 None,
             )

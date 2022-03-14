@@ -170,8 +170,8 @@ class LED:
 
     @staticmethod
     def create_set_ir_lights(
-        state: str,
         channel: int,
+        state: str,
         _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
     ):
         """Create Set IR State Request"""
@@ -183,7 +183,7 @@ class LED:
             ),
         )
 
-    async def set_ir_lights(self, state: str, channel: int):
+    async def set_ir_lights(self, state: str, channel: int = 0):
         """Set IR Light State"""
 
         value = next(
