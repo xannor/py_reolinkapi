@@ -4,10 +4,8 @@ from enum import IntEnum
 from typing import Annotated, TypedDict
 
 from .base import Ability, BooleanAbilityVers, VideoClipAbilityVers
-from .channel import ChannelAbilities
+from .channel import All as ChannelAbilities
 from .support import SupportAbilities
-
-_Abilities = TypedDict("_Abilities", {"3g": Ability})
 
 
 class TimeAbilityVers(IntEnum):
@@ -87,7 +85,11 @@ class RecordAbilities(TypedDict, total=False):
 
 
 class Abilities(
-    AlarmAbilities, FTPAbilities, RecordAbilities, SupportAbilities, total=False
+    AlarmAbilities,
+    FTPAbilities,
+    RecordAbilities,
+    SupportAbilities,
+    total=False,
 ):
     """Abilities"""
 
@@ -144,3 +146,6 @@ class Abilities(
     dateFormat: Annotated[Ability, BooleanAbilityVers]
     emailInterval: Annotated[Ability, BooleanAbilityVers]
     showQrCode: Annotated[Ability, BooleanAbilityVers]
+
+
+ABILITIES_3G = "3g"

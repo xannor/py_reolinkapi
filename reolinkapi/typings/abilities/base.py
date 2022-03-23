@@ -1,7 +1,7 @@
 """System Abilities Typings"""
 
 from enum import IntEnum, IntFlag
-from typing import Annotated, TypedDict
+from typing import Annotated, Final, TypedDict
 
 
 class Permissions(IntFlag):
@@ -33,3 +33,7 @@ class Ability(TypedDict):
 
     ver: int
     permit: Annotated[int, Permissions]
+
+
+ABILITY_VALUE: Final = "ver"
+ABILITY_PERMISSION: Final = "permit"

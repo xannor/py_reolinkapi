@@ -1,4 +1,5 @@
 """test encrypt mixin"""
+from __future__ import annotations
 
 import json
 import logging
@@ -41,34 +42,45 @@ class MockClientResponse:
 class EncryptTestRig(Encrypt):
     """Encryp mixin test rig"""
 
+    def __init__(self, *args, **kwargs):
+        self.__auth_header = kwargs.pop("AUTH_HEADER", None)
+        if self.__auth_header is None:
+            self.__auth_header = _AUTH_HEADER
+        self.__create_nonce = kwargs.pop("CNONCE", None)
+        self.__cipher_key = ""
+        self.__token_response = kwargs.pop("TOKEN", None)
+        if self.__token_response is None:
+            self.__token_response = _JSON[LOGIN_COMMAND][1]
+        super().__init__(*args, **kwargs)
+
+    def _create_nonce(self):
+        if self.__create_nonce is not None:
+            return self.__create_nonce()
+        return super()._create_nonce()
+
     async def _execute_request(
         self, *args: CommandRequestWithParam, use_get: bool = False
     ):  # pylint: disable=method-hidden
         _j = json.dumps(args)
 
         if args[0]["cmd"] == LOGIN_COMMAND and "Digest" not in args[0]["param"]:
-            return (
-                MockClientResponse(
-                    "/cgi-bin/api.cgi?cmd=Login",
-                    {"WWW-Authenticate": _AUTH_HEADER},
-                    "",
-                ),
-                False,
+            return MockClientResponse(
+                "/cgi-bin/api.cgi?cmd=Login",
+                {"WWW-Authenticate": self.__auth_header},
+                "",
             )
-        return (
-            MockClientResponse(
-                "",
-                {},
-                "",
-            ),
-            True,
+        return MockClientResponse(
+            "/cgi-bin/api.cgi?cmd=Login",
+            {},
+            self._encrypt(self.__token_response)
+            if self.__token_response[0] == "["
+            else self.__token_response,
         )
 
     async def _process_response(
         self, response: MockClientResponse
     ):  # pylint: disable=method-hidden
-        data = self._encrypt(_JSON[LOGIN_COMMAND][1])
-        data = self._decrypt(data)
+        data = self._decrypt(await response.text())
         data = json.loads(data)
         response.close()
         return data
@@ -81,13 +93,34 @@ class EncryptTestRig(Encrypt):
         assert results is not None
         return True
 
-    def create_cipher(self, key: str):
+    def _create_cipher(self, key: str):
+        self.__cipher_key = key
+        return super()._create_cipher(key)
+
+    @property
+    def cipher_key(self):
+        """get cipher key"""
+        return self.__cipher_key
+
+    def create_cipher(
+        self, key: str, value: int | None = None, total: int | None = None
+    ):
         """create cipher"""
-        return self._create_cipher(key)
+        self._create_cipher(key)
+        if value is not None and total is not None:
+            self._create_counts(value, total)
+
+    def query_data_by_count(self, _id: int | None = None, **kwargs):
+        """create query encrypt"""
+        return self._query_data_by_count(_id, **kwargs)
 
     def decrypt(self, data: str):
         """decrypt"""
         return self._decrypt(data)
+
+    def encrypt(self, data: str):
+        """encrypt"""
+        return self._encrypt(data)
 
 
 async def test_login():

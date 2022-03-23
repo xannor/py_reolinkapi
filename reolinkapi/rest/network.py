@@ -3,7 +3,6 @@ from __future__ import annotations
 
 
 from typing import Final, Iterable, TypedDict
-from urllib.parse import quote_plus
 
 from . import connection, security
 
@@ -298,6 +297,8 @@ class Network:
                 ):
                     result = result["value"]["rtspUrl"]
                     url: str = result[f"{stream.name.lower()}Stream"]
+                    if self._auth_token:
+                        return f"{url}&token={self._auth_token}"
                     return url
 
             self.__no_get_rtsp = True
@@ -312,7 +313,7 @@ class Network:
 
         url = f'rtsp://{self.__link["static"]["ip"]}{port}/h264Preview_{channel:02}_{stream.name.lower()}'
         if self._auth_token:
-            return f"{url}&Token={quote_plus(self._auth_token)}"
+            return f"{url}&token={self._auth_token}"
         return url
 
     async def get_rtmp_url(
@@ -330,7 +331,7 @@ class Network:
 
         url = f'rtmp://{self.__link["static"]["ip"]}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}'
         if self._auth_token != "":
-            return f"{url}&Token={quote_plus(self._auth_token)}"
+            return f"{url}&token={self._auth_token}"
         return url
 
     @staticmethod

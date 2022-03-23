@@ -16,3 +16,10 @@ class LoginToken(TypedDict):
 
     leaseTime: int
     name: str
+
+
+class LoginTokenV2(LoginToken):
+    """Login Token V2"""
+
+    checkBasic: int
+    countTotal: int

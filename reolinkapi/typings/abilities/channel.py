@@ -1,7 +1,7 @@
 """Channel Abilities"""
 
 from enum import IntEnum
-from typing import Annotated, TypedDict
+from typing import Annotated, Final, Literal, TypedDict, get_args
 
 from .base import Ability, BooleanAbilityVers, VideoClipAbilityVers
 from . import support
@@ -87,6 +87,14 @@ class PTZAbilities(TypedDict, total=False):
     ptzDirection: Annotated[Ability, PTZDirectionAbilityVers]
 
 
+PTZ_TYPE: Final = "ptzType"
+PTZ_CONTROL: Final = "ptzCtrl"
+PTZ_PRESET: Final = "ptzPreset"
+PTZ_PATROL: Final = "ptzPatrol"
+PTZ_TATTERN: Final = "ptzTattern"
+PTZ_DIRECTION: Final = "ptzDirection"
+
+
 class RecordScheduleAbilityVers(IntEnum):
     """Record Schedule Ability Values"""
 
@@ -155,14 +163,7 @@ class SupportAbilities(support.AIAbilities, support.FloodLightAbilities):
     supportWhiteDark: Annotated[Ability, BooleanAbilityVers]
 
 
-class ChannelAbilities(
-    RecordAbilities,
-    PTZAbilities,
-    AlarmAbilities,
-    ISPAbilities,
-    SupportAbilities,
-    total=False,
-):
+class ChannelAbilities(TypedDict, total=False):
     """Channel Abilities"""
 
     mask: Annotated[Ability, BooleanAbilityVers]
@@ -186,3 +187,17 @@ class ChannelAbilities(
     shelterCfg: Annotated[Ability, BooleanAbilityVers]
     batAnalysis: Annotated[Ability, BooleanAbilityVers]
     ledControl: Annotated[Ability, BooleanAbilityVers]
+
+
+CHANNEL_MAIN_ENCODING_TYPE: Final = "mainEncType"
+
+
+class All(
+    ChannelAbilities,
+    RecordAbilities,
+    PTZAbilities,
+    AlarmAbilities,
+    ISPAbilities,
+    SupportAbilities,
+):
+    """All Channel Abilities"""

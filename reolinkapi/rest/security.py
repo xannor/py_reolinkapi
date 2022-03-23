@@ -5,8 +5,6 @@ import inspect
 import time
 from typing import Callable, Final, Iterable, TypedDict
 
-from git import CommandError
-
 from . import connection, encrypt
 
 from ..typings.commands import (
@@ -18,7 +16,7 @@ from ..typings.commands import (
 from ..typings.security import LoginInfo, LoginToken
 from ..helpers import commands as commandHelpers
 
-from .exceptions import ErrorCodes
+from .exceptions import CommandError, ErrorCodes
 
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 
@@ -52,6 +50,7 @@ class Security:
         super().__init__(*args, **kwargs)
         self.__last_pwd_hash = 0
         self.__token_expires: float = 0
+        self._auth_failed = False
         other: any = self
         if isinstance(other, connection.Connection):
             other._disconnect_callbacks.append(self.logout)
@@ -69,6 +68,11 @@ class Security:
         """authentication status"""
         # we use a 1s offest to give time for simple checks to do an operation
         return self.authentication_timeout > 1
+
+    @property
+    def authentication_required(self):
+        """Authentication is missing or invalid"""
+        return self._auth_failed
 
     @property
     def _auth_token(self):
@@ -154,6 +158,7 @@ class Security:
                     return False
             raise CommandError(result)
 
+        self._auth_failed = False
         self.__token = result["value"]["Token"]["name"]
         self.__token_expires = time.time() + result["value"]["Token"]["leaseTime"]
 
@@ -180,5 +185,6 @@ class Security:
                 await callback()
             else:
                 callback()
+        self._auth_failed = False
         self.__token = ""
         self.__token_expires = 0

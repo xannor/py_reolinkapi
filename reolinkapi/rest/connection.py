@@ -8,6 +8,7 @@ import inspect
 import json
 import logging
 from typing import Callable, Iterable, Protocol
+from urllib.parse import urlparse
 import aiohttp
 
 from reolinkapi.helpers.commands import isparam, iserror
@@ -65,11 +66,13 @@ class Connection:
         if isinstance(other, security.Security) and not hasattr(self, "_auth_token"):
             self._auth_token = other._auth_token
             self._has_auth_failure = other._has_auth_failure
-            self.logout = other.logout
+            self._auth_failed = other._auth_failed
+
         if isinstance(other, encrypt.Encrypt) and not hasattr(self, "encrypt"):
             self._can_encrypt = other._can_encrypt
             self._encrypt = other._encrypt
             self._decrypt = other._decrypt
+            self._query_data_by_count = other._query_data_by_count
         elif not hasattr(self, "_can_encrypt"):
             self._can_encrypt = False
 
@@ -85,6 +88,11 @@ class Connection:
     def base_url(self):
         """base url"""
         return self.__base_url
+
+    @property
+    def secured(self):
+        """Secure connection"""
+        return self.__base_url.startswith("https:")
 
     @property
     def hostname(self):
@@ -114,6 +122,19 @@ class Connection:
             port = None
         else:
             https = encryption == Encryption.HTTPS
+        await self._setup_connection(
+            hostname, port, timeout, https, encryption == Encryption.AES
+        )
+
+    async def _setup_connection(
+        self,
+        hostname: str,
+        port: int | None,
+        timeout: float,
+        https: bool,
+        can_encrypt: bool,
+        full_reset: bool = True,
+    ):
         scheme = "https" if https is True else "http"
         _port = f":{port}" if port is not None else ""
         url = f"{scheme}://{hostname}{_port}"
@@ -121,14 +142,17 @@ class Connection:
         if _id == self.__connection_id:
             return
         if self.__connection_id != 0:
-            await self.disconnect()
+            if full_reset:
+                await self.disconnect()
+            else:
+                await self.__session.close()
+
         self.__base_url = url
         self.__connection_id = _id
         self.__hostname = hostname
-        if https or encryption != Encryption.AES:
+        if https or not can_encrypt:
             self._can_encrypt = False
-        if self.__session is None or self.__session.closed:
-            self.__session = self._create_session(timeout)
+        self.__session = self._create_session(timeout)
 
     async def disconnect(self):
         """disconnect from device"""
@@ -165,10 +189,24 @@ class Connection:
         if len(args) == 0:
             return None
         query = {"cmd": args[0]["cmd"]}
-        if self._auth_token != "":
-            query["token"] = self._auth_token
+        if use_get and isparam(args[0]):
+            query.update(args[0]["param"])
+        url = "/cgi-bin/api.cgi"
+        if args[0]["cmd"] == security.LOGIN_COMMAND:
+            url += f'?cmd={args[0]["cmd"]}'
+        elif self._auth_token != "":
+            url += f"?token={self._auth_token}"
+        count = None
+        if self._can_encrypt:
+            (count, enc) = self._query_data_by_count(
+                *(f"{_k}={_v}" for _k, _v in query.items())
+            )
+            if enc:
+                count.free = False
+                url += f"&encrypt={enc}"
+                query.clear()
 
-        headers = {"accept": "application/json"}
+        headers = {"Accept": "*/*", "Content-Type": "application/json"}
 
         cleanup = True
         response = None
@@ -176,11 +214,9 @@ class Connection:
         try:
             encrypted = False
             if use_get:
-                if isparam(args[0]):
-                    query.update(args[0]["param"])
-                _LOGGER.debug("GET: %s?%s", self.__hostname, query)
+                _LOGGER.debug("GET: %s<-%s", url, query)
                 context = self.__session.get(
-                    "/cgi-bin/api.cgi",
+                    url,
                     params=query,
                     headers=headers,
                     allow_redirects=False,
@@ -190,22 +226,68 @@ class Connection:
                 if self._can_encrypt:
                     edata = self._encrypt(data)
                     encrypted = data != edata
-                    if encrypted:
-                        query.pop("cmd", None)
                 else:
                     edata = data
 
-                _LOGGER.debug("POST: %s?%s", self.__hostname, query)
-                _LOGGER_DATA.debug("%s<-%s", "E" if encrypted else "", data)
+                _LOGGER_DATA.debug(
+                    "%s%s<-%s", self.__hostname, "(E)" if encrypted else "", data
+                )
                 context = self.__session.post(
-                    "/cgi-bin/api.cgi",
-                    params=query,
+                    url,
                     data=edata,
                     headers=headers,
                     allow_redirects=False,
                 )
 
             response = await context
+            if count is not None:
+                count.free = True
+            if response.status in (302, 301) and "location" in response.headers:
+                location = response.headers["location"]
+                redir = urlparse(location)
+                base = urlparse(self.__base_url)
+                if (
+                    base.scheme != redir.scheme
+                    and base.scheme == "http"
+                    or redir.scheme == "http"
+                ):
+                    if redir.scheme == "http":
+                        _LOGGER.warning(
+                            "Got http redirect from camera (%s), please verify configuration",
+                            self.__base_url,
+                        )
+                        await self._setup_connection(
+                            redir.hostname,
+                            redir.port,
+                            self.__session.timeout.total,
+                            False,
+                            True,
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "Got https redirect from camera (%s), please verify configuration",
+                            self.__base_url,
+                        )
+                        await self._setup_connection(
+                            redir.hostname,
+                            redir.port,
+                            self.__session.timeout.total,
+                            True,
+                            True,
+                        )
+                    return await self._execute_request(*args)
+
+                _LOGGER.error(
+                    "got unexpected redirect from camera (%s), please verify configurtation",
+                    self.__base_url,
+                )
+                raise aiohttp.ClientResponseError(
+                    response.request_info,
+                    [response],
+                    status=response.status,
+                    headers=response.headers,
+                )
+
             if response.status >= 500:
                 _LOGGER.error("got critical (%d) response code", response.status)
                 raise aiohttp.ClientResponseError(
@@ -231,6 +313,8 @@ class Connection:
             raise
         except asyncio.TimeoutError:
             _LOGGER.error("timeout")
+            raise
+        except Exception as e:
             raise
         finally:
             if cleanup:
@@ -275,7 +359,7 @@ class Connection:
         _LOGGER_DATA.debug("%s->%s", "D" if decrypted else "", data)
 
         if self._auth_token != None and self._has_auth_failure(data):
-            await self.logout()
+            self._auth_failed = True
 
         return data
 
