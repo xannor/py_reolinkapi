@@ -7,18 +7,22 @@ from enum import IntEnum
 import inspect
 import json
 import logging
-from typing import Callable, Iterable, Protocol
+from typing import Callable, Iterable, Protocol, overload
 from urllib.parse import urlparse
 import aiohttp
 
-from reolinkapi.helpers.commands import isparam, iserror
+from ..helpers.commands import isparam
 
 from ..exceptions import (
     InvalidResponseError,
 )
 from ..typings.commands import CommandRequest, CommandResponse
 
-from . import security, encrypt
+from . import encrypt
+from ..helpers import security as securityHelpers
+
+from ..base.connection import Connection as BaseConnection
+from ..base.security import Security as BaseSecurity
 
 from ..const import DEFAULT_TIMEOUT
 
@@ -49,11 +53,14 @@ class Encryption(IntEnum):
     AES = 2
 
 
-class Connection:
+PROCESS_RESPONSES_CALLBACK_TYPE = Callable[[list[CommandResponse]], None]
+
+
+class Connection(BaseConnection):
     """REST Connection"""
 
     def __init__(self, *args, session_factory: SessionFactory = None, **kwargs):
-        self._disconnect_callbacks: list[Callable[[], None]] = []
+        self._process_responses_callbacks: list[PROCESS_RESPONSES_CALLBACK_TYPE] = []
         super().__init__(*args, **kwargs)
         self.__session: aiohttp.ClientSession | None = None
         self.__session_factory: SessionFactory = (
@@ -62,19 +69,6 @@ class Connection:
         self.__base_url = ""
         self.__hostname = ""
         self.__connection_id = 0
-        other: any = self
-        if isinstance(other, security.Security) and not hasattr(self, "_auth_token"):
-            self._auth_token = other._auth_token
-            self._has_auth_failure = other._has_auth_failure
-            self._auth_failed = other._auth_failed
-
-        if isinstance(other, encrypt.Encrypt) and not hasattr(self, "encrypt"):
-            self._can_encrypt = other._can_encrypt
-            self._encrypt = other._encrypt
-            self._decrypt = other._decrypt
-            self._query_data_by_count = other._query_data_by_count
-        elif not hasattr(self, "_can_encrypt"):
-            self._can_encrypt = False
 
     def _create_session(self, timeout: int):
         return self.__session_factory(self.__base_url, timeout)
@@ -99,6 +93,7 @@ class Connection:
         """hostname"""
         return self.__hostname
 
+    @overload
     async def connect(
         self,
         hostname: str,
@@ -106,14 +101,18 @@ class Connection:
         timeout: float = DEFAULT_TIMEOUT,
         *,
         encryption: Encryption = Encryption.NONE,
-    ):
-        """
-        setup connection to device
+    ):  # pylint: disable=arguments-differ
+        ...
 
-        full_encrypt will enable a basic cleartext encryption on all
-        requests, otherwise only login will be encrypted (if supported)
-        This is ignored if https is used
-        """
+    async def connect(
+        self,
+        hostname: str,
+        port: int = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        **kwargs,
+    ):
+        """setup connection to device"""
+        encryption = kwargs.get("encryption", Encryption.NONE)
         if port == 443 or (port is None and encryption == Encryption.HTTPS):
             https = True
             port = None
@@ -150,8 +149,8 @@ class Connection:
         self.__base_url = url
         self.__connection_id = _id
         self.__hostname = hostname
-        if https or not can_encrypt:
-            self._can_encrypt = False
+        if (https or not can_encrypt) and isinstance(self, encrypt.Encrypt):
+            self._can_encrypt = False  # pylint: disable=attribute-defined-outside-init
         self.__session = self._create_session(timeout)
 
     async def disconnect(self):
@@ -180,7 +179,9 @@ class Connection:
 
         return True
 
-    async def _execute_request(self, *args: CommandRequest, use_get: bool = False):
+    async def _execute_request(
+        self, *args: CommandRequest, use_get: bool = False
+    ) -> aiohttp.ClientResponse | None:
         """Internal API"""
 
         if not self._ensure_connection():
@@ -192,12 +193,13 @@ class Connection:
         if use_get and isparam(args[0]):
             query.update(args[0]["param"])
         url = "/cgi-bin/api.cgi"
-        if args[0]["cmd"] == security.LOGIN_COMMAND:
+        if args[0]["cmd"] == securityHelpers.LOGIN_COMMAND:
             url += f'?cmd={args[0]["cmd"]}'
-        elif self._auth_token != "":
-            url += f"?token={self._auth_token}"
+        elif isinstance(self, BaseSecurity):
+            if self._auth_token != "":
+                url += f"?token={self._auth_token}"
         count = None
-        if self._can_encrypt:
+        if isinstance(self, encrypt.Encrypt) and self._can_encrypt:
             (count, enc) = self._query_data_by_count(
                 *(f"{_k}={_v}" for _k, _v in query.items())
             )
@@ -314,20 +316,12 @@ class Connection:
         except asyncio.TimeoutError:
             _LOGGER.error("timeout")
             raise
-        except Exception as e:
-            raise
         finally:
             if cleanup:
                 if response is not None:
                     response.close()
                 if context is not None:
                     context.close()
-
-    @staticmethod
-    def get_error_responses(responses: Iterable[CommandResponse]):
-        """Get LocalLink Responses"""
-
-        return filter(iserror, responses)
 
     async def _process_response(
         self, response: aiohttp.ClientResponse
@@ -338,11 +332,12 @@ class Connection:
         try:
             data = await response.text()
             decrypted = False
-            if self._can_encrypt and data[0] != "[":
-                ddata = self._decrypt(data)
-                decrypted = data != ddata
-                if decrypted:
-                    data = ddata
+            if isinstance(self, encrypt.Encrypt):
+                if self._can_encrypt and data[0] != "[":
+                    ddata = self._decrypt(data)
+                    decrypted = data != ddata
+                    if decrypted:
+                        data = ddata
 
             if data[0] != "[":
                 _LOGGER.error("did not get json as response: (%s)", data)
@@ -358,13 +353,23 @@ class Connection:
             data = [data]
         _LOGGER_DATA.debug("%s->%s", "D" if decrypted else "", data)
 
-        if self._auth_token != None and self._has_auth_failure(data):
-            self._auth_failed = True
+        for callback in self._process_responses_callbacks:
+            if inspect.iscoroutinefunction(callback):
+                await callback(data)
+            else:
+                callback(data)
 
         return data
 
-    async def _execute(self, *args: CommandRequest, use_get: bool = False):
+    @overload
+    async def _execute(
+        self, *args: CommandRequest, use_get: True
+    ):  # pylint: disable=arguments-differ
+        ...
+
+    async def _execute(self, *args: CommandRequest, **kwargs):
         """Internal API"""
+        use_get = kwargs.get("use_get", False)
         return await self._process_response(
             await self._execute_request(*args, use_get=use_get)
         )

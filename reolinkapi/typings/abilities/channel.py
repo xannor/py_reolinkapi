@@ -1,7 +1,7 @@
 """Channel Abilities"""
 
 from enum import IntEnum
-from typing import Annotated, Final, Literal, TypedDict, get_args
+from typing import Annotated, Final, TypedDict
 
 from .base import Ability, BooleanAbilityVers, VideoClipAbilityVers
 from . import support

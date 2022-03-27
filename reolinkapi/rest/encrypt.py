@@ -17,13 +17,16 @@ from ..typings.commands import (
 )
 from ..typings.security import LoginTokenV2
 
-from . import connection, security
-from ..helpers import commands as commandHelpers
+from . import connection
+from ..helpers import security as securityHelpers
 
 from ..typings.encrypt import DigestInfo
 
+from ..base.connection import Connection as BaseConnection
+from ..base.security import Security as BaseSecurity
 
-def _istokenv2(token: security.LoginToken) -> TypeGuard[LoginTokenV2]:
+
+def _istokenv2(token: securityHelpers.LoginToken) -> TypeGuard[LoginTokenV2]:
     return "checkBasic" in token
 
 
@@ -60,27 +63,31 @@ class Encrypt:
     """Encryption Mixin"""
 
     def __init__(self, *args, **kwargs):
-        self._can_encrypt = True
+        self.__can_encrypt = True
         super().__init__(*args, **kwargs)
         self.__cipher: Cipher | None = None
         self.__counts: list[_SyncCount] | None = None
-        other: any = self
-        if isinstance(other, connection.Connection):
-            other._disconnect_callbacks.append(self.__cleanup_dc)
-            if not hasattr(self, "_execute_request"):
-                self._execute_request = other._execute_request
-                self._process_response = other._process_response
-
-        if isinstance(other, security.Security):
-            other._logout_callbacks.append(self.__cleanup)
+        if isinstance(self, BaseConnection):
+            self._disconnect_callbacks.append(self.__cleanup_dc)
+        if isinstance(self, BaseSecurity):
+            self._logout_callbacks.append(self.__cleanup)
+        self._can_encrypt = True
 
     @property
     def encrypted(self):
         """Encryption enabled"""
-        return self._can_encrypt and self.__cipher is not None
+        return self.__can_encrypt and self.__cipher is not None
+
+    @property
+    def _can_encrypt(self):
+        return self.__can_encrypt
+
+    @_can_encrypt.setter
+    def _can_encrypt(self, value: bool):
+        self.__can_encrypt = value
 
     def __cleanup_dc(self):
-        self._can_encrypt = True
+        self.__can_encrypt = True
 
     def __cleanup(self):
         self.__cipher = None
@@ -145,16 +152,18 @@ class Encrypt:
         return _create_random_nonce()
 
     async def _encrypted_login(self, username: str, password: str):
-        response = await self._execute_request(
-            CommandRequestWithParam(
-                cmd=security.LOGIN_COMMAND,
-                action=CommandRequestTypes.VALUE_ONLY,
-                param=EncryptionLoginRequestParam(Version=1),
+        response = None
+        if isinstance(self, connection.Connection):
+            response = await self._execute_request(
+                CommandRequestWithParam(
+                    cmd=securityHelpers.LOGIN_COMMAND,
+                    action=CommandRequestTypes.VALUE_ONLY,
+                    param=EncryptionLoginRequestParam(Version=1),
+                )
             )
-        )
 
-        if response is None or not self._can_encrypt:
-            self._can_encrypt = False
+        if response is None or not self.__can_encrypt:
+            self.__can_encrypt = False
             return None
         auth = response.headers.get("WWW-Authenticate")
         _comma = (
@@ -172,7 +181,7 @@ class Encrypt:
         )
         auth = dict(_clean) if _clean is not None else None
         if auth is None:
-            self._can_encrypt = False
+            self.__can_encrypt = False
             return None
 
         digest = cast(DigestInfo, dict())
@@ -206,25 +215,24 @@ class Encrypt:
             .upper()
         )
 
-        response = await self._execute_request(
-            CommandRequestWithParam(
-                cmd=security.LOGIN_COMMAND,
-                action=CommandRequestTypes.VALUE_ONLY,
-                param=EncrtypedLoginRequestParam(Version=1, Digest=digest),
+        _responses = None
+        if isinstance(self, connection.Connection):
+            _responses = await self._execute_request(
+                CommandRequestWithParam(
+                    cmd=securityHelpers.LOGIN_COMMAND,
+                    action=CommandRequestTypes.VALUE_ONLY,
+                    param=EncrtypedLoginRequestParam(Version=1, Digest=digest),
+                )
             )
-        )
+        if _responses is None:
+            return None
         self._create_cipher(key)
-        responses = await self._process_response(response)
-        token = next(
-            (
-                response
-                for response in responses
-                if commandHelpers.isvalue(response)
-                and response["cmd"] == security.LOGIN_COMMAND
-                and security._istoken(response)  # pylint: disable=protected-access
-            ),
-            None,
-        )
+        responses = None
+        if isinstance(self, connection.Connection):
+            responses = await self._process_response(_responses)
+        if responses is None:
+            return None
+        token = next(securityHelpers.login_responses(responses), None)
         if token is not None and _istokenv2(token["value"]["Token"]):
             self._create_counts(
                 token["value"]["Token"]["checkBasic"],

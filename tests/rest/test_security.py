@@ -2,7 +2,8 @@
 
 import logging
 import os
-from reolinkapi.rest.security import Security, LOGIN_COMMAND, LOGOUT_COMMAND
+from reolinkapi.rest.security import Security
+from reolinkapi.helpers.security import LOGIN_COMMAND, LOGOUT_COMMAND
 
 
 from reolinkapi.rest import Client

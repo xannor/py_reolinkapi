@@ -2,8 +2,8 @@
 
 import logging
 import os
-from reolinkapi.rest.led import (
-    LED,
+from reolinkapi.base.led import LED
+from reolinkapi.helpers.led import (
     GET_IR_LIGHTS_COMMAND,
     SET_IR_LIGHTS_COMMAND,
     GET_POWER_LED_COMMAND,
@@ -66,70 +66,5 @@ async def test_live_get_irlights(caplog):
         os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
     )
     info = await client.get_ir_lights()
-    assert info is not None
-    await client.disconnect()
-
-
-async def test_channelstatus():
-    """channel status expected values test"""
-
-    client = LEDTestRig()
-    info = await client.get_channel_status()
-    assert info is not None
-
-
-async def test_live_channelstatus(caplog):
-    """channel status live test"""
-
-    caplog.set_level(logging.DEBUG)
-    client = Client()
-    await client.connect(os.environ.get("DEV_IP", "localhost"))
-    assert await client.login(
-        os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
-    )
-    info = await client.get_channel_status()
-    assert info is not None
-    await client.disconnect()
-
-
-async def test_ports():
-    """get ports expected values test"""
-
-    client = LEDTestRig()
-    info = await client.get_ports()
-    assert info is not None
-
-
-async def test_live_ports(caplog):
-    """get ports live test"""
-
-    caplog.set_level(logging.DEBUG)
-    client = Client()
-    await client.connect(os.environ.get("DEV_IP", "localhost"))
-    assert await client.login(
-        os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
-    )
-    info = await client.get_ports()
-    assert info is not None
-    await client.disconnect()
-
-
-async def test_p2p():
-    """local p2p values test"""
-
-    client = LEDTestRig()
-    assert await client.get_p2p() is not None
-
-
-async def test_live_p2p(caplog):
-    """local p2p test"""
-
-    caplog.set_level(logging.DEBUG)
-    client = Client()
-    await client.connect(os.environ.get("DEV_IP", "localhost"))
-    assert await client.login(
-        os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
-    )
-    info = await client.get_p2p()
     assert info is not None
     await client.disconnect()

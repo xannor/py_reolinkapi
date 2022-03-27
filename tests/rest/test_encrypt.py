@@ -8,7 +8,7 @@ from reolinkapi.rest import Client
 
 from reolinkapi.rest.encrypt import Encrypt
 from reolinkapi.typings.commands import CommandRequestWithParam
-from reolinkapi.rest.security import LOGIN_COMMAND
+from reolinkapi.helpers.security import LOGIN_COMMAND
 from reolinkapi.const import DEFAULT_USERNAME, DEFAULT_PASSWORD
 
 _JSON = {

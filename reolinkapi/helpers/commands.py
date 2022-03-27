@@ -1,11 +1,13 @@
 """"Command helpers"""
 from __future__ import annotations
 
-from typing import Mapping, TypeVar
+from typing import Iterable, Mapping, TypeVar
 from typing_extensions import TypeGuard
 
 from ..typings.commands import (
+    COMMAND,
     COMMAND_REQUEST_PARAM_LITERAL,
+    COMMAND_RESPONSE_CODE,
     COMMAND_RESPONSE_VALUE_LITERAL,
     CommandRequest,
     CommandRequestWithParam,
@@ -18,7 +20,7 @@ from ..typings.commands import (
     COMMAND_RESPONSE_ERROR,
 )
 
-T = TypeVar("T")
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 
 def isparam(request: CommandRequest) -> TypeGuard[CommandRequestWithParam]:
@@ -37,11 +39,20 @@ def create_param_has_key(
     def _typeguard(
         request: CommandRequestWithParam,
     ) -> TypeGuard[Mapping[COMMAND_REQUEST_PARAM_LITERAL, T]]:
-        return key in request["param"] and isinstance(
-            request["param"][key], __class_or_tuple
+        return key in request[COMMAND_REQUEST_PARAM] and isinstance(
+            request[COMMAND_REQUEST_PARAM][key], __class_or_tuple
         )
 
     return _typeguard
+
+
+def create_is_command(command: str):
+    """Create Command Typeguard"""
+
+    def _filter(response: CommandResponse):
+        return response[COMMAND] == command
+
+    return _filter
 
 
 def isvalue(response: CommandResponse) -> TypeGuard[CommandResponseValue]:
@@ -68,11 +79,22 @@ def create_value_has_key(
     def _typeguard(
         response: CommandResponseValue,
     ) -> TypeGuard[Mapping[COMMAND_RESPONSE_VALUE_LITERAL, T]]:
-        return key in response["value"] and isinstance(
-            response["value"][key], __class_or_tuple
+        return key in response[COMMAND_RESPONSE_VALUE] and isinstance(
+            response[COMMAND_RESPONSE_VALUE][key], __class_or_tuple
         )
 
     return _typeguard
 
 
-isresponse = create_value_has_key("rspCode", CommandResponseCodeValue, int)
+isresponseCode = create_value_has_key(
+    COMMAND_RESPONSE_CODE, CommandResponseCodeValue, int
+)
+
+
+def get_response_codes(responses: Iterable[CommandResponse]):
+    """Get Response Codes"""
+
+    return map(
+        lambda response: response[COMMAND_RESPONSE_VALUE][COMMAND_RESPONSE_CODE],
+        filter(isresponseCode, filter(isvalue, responses)),
+    )

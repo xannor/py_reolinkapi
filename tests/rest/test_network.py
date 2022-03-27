@@ -2,8 +2,8 @@
 
 import logging
 import os
-from reolinkapi.rest.network import (
-    Network,
+from reolinkapi.base.network import Network
+from reolinkapi.helpers.network import (
     GET_CHANNEL_STATUS_COMMAND,
     GET_LOCAL_LINK_COMMAND,
     GET_NETWORK_PORT_COMMAND,

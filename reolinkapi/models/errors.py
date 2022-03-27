@@ -1,17 +1,13 @@
-""" Rest Exception """
+"""Error models"""
+
 
 from enum import Enum
-from ..exceptions import InvalidResponseError
-
-
-class CommandError(InvalidResponseError):
-    """Error Returned"""
 
 
 class ErrorCode(int):
     """Expanded Error Code"""
 
-    def __new__(cls, code: int, *args):
+    def __new__(cls, code: int, *_):
         return super().__new__(cls, code)
 
     def __init__(self, _, label: str, description: str):

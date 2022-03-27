@@ -47,6 +47,8 @@ class CommandResponse(TypedDict):
     code: int
 
 
+COMMAND: Final = "cmd"
+
 # this should be generic but they are not supported yet
 class CommandResponseValue(CommandResponse):
     """Comand Response Value"""
@@ -64,6 +66,9 @@ class CommandResponseCodeValue(TypedDict):
     """Command Response Code Value"""
 
     rspCode: int
+
+
+COMMAND_RESPONSE_CODE: Final = "rspCode"
 
 
 class ErrorCode(TypedDict):
