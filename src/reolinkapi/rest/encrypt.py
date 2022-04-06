@@ -233,10 +233,10 @@ class Encrypt:
         if responses is None:
             return None
         token = next(securityHelpers.login_responses(responses), None)
-        if token is not None and _istokenv2(token["value"]["Token"]):
+        if token is not None and _istokenv2(token):
             self._create_counts(
-                token["value"]["Token"]["checkBasic"],
-                token["value"]["Token"]["countTotal"],
+                token["checkBasic"],
+                token["countTotal"],
             )
 
         return responses

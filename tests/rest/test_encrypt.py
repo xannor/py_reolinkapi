@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from reolinkapi.rest import Client
+from reolinkapi.rest.connection import Encryption
 
 from reolinkapi.rest.encrypt import Encrypt
 from reolinkapi.typings.commands import CommandRequestWithParam
@@ -150,7 +151,9 @@ async def test_live_login(caplog):
 
     caplog.set_level(logging.DEBUG)
     client = Client()
-    await client.connect(os.environ.get("DEV_IP", "localhost"))
+    await client.connect(
+        os.environ.get("DEV_IP", "localhost"), encryption=Encryption.AES
+    )
     assert await client.login(
         os.environ.get("DEV_USER", "admin"), os.environ.get("DEV_PASS", "")
     )
