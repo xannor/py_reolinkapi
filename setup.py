@@ -1,10 +1,13 @@
 """ setup """
 
 from distutils.core import setup
+from setuptools import find_packages
+
 
 setup(
     name="reolinkapi",
-    packages=["reolinkapi"],
+    packages=find_packages(where="reolinkapi"),
+    package_dir={"": "reolinkapi"},
     version="0.0.1",
     license="MIT",
     description="Reolink camera api for python",
