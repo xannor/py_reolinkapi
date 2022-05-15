@@ -51,7 +51,7 @@ class Connection(ABC):
     async def _execute(self, *args: CommandRequest) -> Iterable[CommandResponse]:
         ...
 
-    @abstractmethod
     async def batch(self, commands: Iterable[CommandRequest]):
         """Execute a batch of commands"""
-        ...
+
+        return await self._execute(*commands)

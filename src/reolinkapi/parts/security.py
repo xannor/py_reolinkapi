@@ -33,7 +33,7 @@ class Security(ABC):
     def authenticated(self):
         """authentication status"""
         # we use a 1s offest to give time for simple checks to do an operation
-        return self.authentication_timeout > 1
+        return not self.__auth_failed and self.authentication_timeout > 1
 
     @property
     def authentication_required(self):
