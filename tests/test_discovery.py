@@ -1,20 +1,21 @@
+""" Discovery Tests """
+
 from __future__ import annotations
 import asyncio
 import logging
 from socket import AF_INET
+from pytest import LogCaptureFixture
 
-from reolinkapi.discovery import BroadcastProtocol, ReplyProtocol
+from reolinkapi.discovery import async_start, async_ping
 
-async def test_live(caplog):
-
+async def test_live(caplog:LogCaptureFixture):
+    """ Test Live Broadcast Ping and reply """
     caplog.set_level(logging.DEBUG)
-    loop = asyncio.get_event_loop()
-    (ltransport, listener) = await loop.create_datagram_endpoint(lambda: ReplyProtocol(), family=AF_INET)
-    (btransport, broadcast) = await loop.create_datagram_endpoint(lambda: BroadcastProtocol(), family=AF_INET, allow_broadcast=True)
+    shutdown = await async_start(lambda d: logging.info("got %s", d))
 
-    await asyncio.sleep(10)
-    btransport.close()
-    ltransport.close()
+    async_ping()
+    await asyncio.sleep(4)
+    shutdown()
     
     assert False
     
