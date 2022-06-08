@@ -9,6 +9,6 @@ class Device(TypedDict):
 
     ip: str
     mac: str
-    name: str
+    name: NotRequired[str]
     ident: NotRequired[str]
     uuid: NotRequired[str]

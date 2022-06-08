@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 import logging
 import socket
 from struct import pack
-
-from .typings.discovery import Device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +22,17 @@ def _nulltermstring(value:bytes, offset:int, maxlength:int = None)->str|None:
     if maxlength is not None and offset - idx > maxlength:
         idx = offset + maxlength
     return value[offset:idx].decode("ascii")
+
+@dataclass
+class Device:
+    """Discovered Device"""
+
+    ip: str
+    mac: str
+    name: str|None = field(default=None)
+    ident: str|None = field(default=None)
+    uuid: str|None = field(default=None)
+
 
 class Protocol(asyncio.DatagramProtocol):
     """UDP Discovery Protocol"""
