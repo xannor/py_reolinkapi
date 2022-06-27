@@ -3,12 +3,14 @@
 from __future__ import annotations
 import asyncio
 import logging
+import os
 from struct import pack
 from pytest import LogCaptureFixture, mark
 
 
 from reolinkapi.discovery import PING_MESSAGE, PORT, Protocol
-from reolinkapi.typings.discovery import Device
+from reolinkapi.models.discovery import Device
+from reolinkapi.typings.discovery import Device as DeviceType
 
 TEST_MAC = 0xFFFFFFFFFFFF.to_bytes(6, 'big')
 TEST_IDENT = "IPC"
@@ -53,18 +55,21 @@ def test_packet():
     )
     message = proto.response
     assert message is not None
-    assert message["ident"] == TEST_IDENT
-    assert message["ip"] == TEST_IP
-    assert message["mac"] == TEST_MAC.hex(':')
-    assert message["uuid"] == TEST_UUID
+    assert message.ident == TEST_IDENT
+    assert message.ip == TEST_IP
+    assert message.mac == TEST_MAC.hex(':')
+    assert message.uuid == TEST_UUID
 
-@mark.skip("Manual run only")
+#@mark.skip("Manual run only")
 async def test_live(caplog:LogCaptureFixture):
     """ Test Live Broadcast Ping and reply """
     caplog.set_level(logging.DEBUG)
     (transport, _) = await TestProtocol.listen()
 
-    TestProtocol.ping()
+    if broadcast := os.environ.get("DEV_PING", None):
+        TestProtocol.ping(broadcast)
+    else:
+        TestProtocol.ping()
     await asyncio.sleep(4)
     transport.close()
     

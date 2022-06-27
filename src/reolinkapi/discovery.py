@@ -2,20 +2,44 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import field
 import logging
 import socket
 from struct import pack
+from typing import Final, TypedDict
+from typing_extensions import NotRequired
+
+from attr import dataclass
 
 _LOGGER = logging.getLogger(__name__)
 
-PORT=3000
-PING=2000
+PORT:Final = 3000
+PING:Final = 2000
 
 # the cameras expect this value and reply with it as a checksum
-PING_MESSAGE = pack("!L", 0xaaaa0000)
+PING_MESSAGE:Final = pack("!L", 0xAAAA0000)
 
-def _nulltermstring(value:bytes, offset:int, maxlength:int = None)->str|None:
+@dataclass
+class Device:
+    """Discovered Device"""
+
+    ip: str  # pylint: disable=invalid-name
+    mac: str
+    name: str | None = field(default=None)
+    ident: str | None = field(default=None)
+    uuid: str | None = field(default=None)
+
+
+class DeviceType(TypedDict):
+    """Discovered Device"""
+
+    ip: str
+    mac: str
+    name: NotRequired[str]
+    ident: NotRequired[str]
+    uuid: NotRequired[str]
+
+def _nulltermstring(value: bytes, offset: int, maxlength: int = None) -> str | None:
     idx = value.index(0, offset)
     if idx <= offset:
         return None
@@ -23,22 +47,12 @@ def _nulltermstring(value:bytes, offset:int, maxlength:int = None)->str|None:
         idx = offset + maxlength
     return value[offset:idx].decode("ascii")
 
-@dataclass
-class Device:
-    """Discovered Device"""
-
-    ip: str
-    mac: str
-    name: str|None = field(default=None)
-    ident: str|None = field(default=None)
-    uuid: str|None = field(default=None)
-
 
 class Protocol(asyncio.DatagramProtocol):
     """UDP Discovery Protocol"""
 
-    def __init__(self, ping_message:bytes = PING_MESSAGE) -> None:
-        self._transport:asyncio.transports.DatagramTransport = None
+    def __init__(self, ping_message: bytes = PING_MESSAGE) -> None:
+        self._transport: asyncio.transports.DatagramTransport = None
         self._reply_verify = ping_message
 
     def connection_made(self, transport: asyncio.transports.DatagramTransport) -> None:
@@ -69,33 +83,33 @@ class Protocol(asyncio.DatagramProtocol):
         if data[104:108] != self._reply_verify:
             return
 
-        #_LOGGER.debug(
-        #    "%r; %r; %r; %r; %r; %r; %r", 
-        #    data[50:58], 
-        #    data[128:132], 
+        # _LOGGER.debug(
+        #    "%r; %r; %r; %r; %r; %r; %r",
+        #    data[50:58],
+        #    data[128:132],
         #    data[0:50].strip(b'\0').rstrip(b'\0'),
         #    data[62:80].strip(b'\0').rstrip(b'\0'),
         #    data[86:104].strip(b'\0').rstrip(b'\0'),
         #    data[148:164].strip(b'\0').rstrip(b'\0'),
         #    data[244:].strip(b'\0').rstrip(b'\0'),
-        #)
+        # )
 
         message = Device(
             ip=_nulltermstring(data, 108, 20),
-            mac=_nulltermstring(data,164,18) or data[80:86].hex(':').upper(),
+            mac=_nulltermstring(data, 164, 18) or data[80:86].hex(":").upper(),
             name=_nulltermstring(data, 132, 32),
-            ident=_nulltermstring(data,58,18),
-            uuid=_nulltermstring(data,228,32)
+            ident=_nulltermstring(data, 58, 18),
+            uuid=_nulltermstring(data, 228, 32),
         )
 
         self.discovered_device(message)
 
-    def discovered_device(self, device:Device)->None:
+    def discovered_device(self, device: Device) -> None:
         """Called when a device is discovered"""
         _LOGGER.debug("Discovered %s", device)
 
     @classmethod
-    async def listen(cls, address:str="0.0.0.0", port:int=PORT):
+    async def listen(cls, address: str = "0.0.0.0", port: int = PORT):
         """Setup discovery listener"""
 
         _LOGGER.debug("Listening on %s", address)
@@ -107,10 +121,11 @@ class Protocol(asyncio.DatagramProtocol):
         return await asyncio.get_event_loop().create_datagram_endpoint(cls, sock=sock)
 
     @classmethod
-    def ping(cls, address:str="255.255.255.255", port:int=PING):
+    def ping(cls, address: str = "255.255.255.255", port: int = PING):
         """Send discovery ping request"""
 
         _LOGGER.debug("Pinging %s:%s", address, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.sendto(PING_MESSAGE, (address, port))
+
