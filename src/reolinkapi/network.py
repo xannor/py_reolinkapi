@@ -1,18 +1,25 @@
 """Network 3.3"""
+from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 from typing import Final, TypedDict
+from typing_extensions import TypeGuard
 
-from pyparsing import Iterable
+try:
+    from enum import StrEnum  # pylint: disable=ungrouped-imports
+except ImportError:
+    from backports.strenum import StrEnum
 
-from .commands import COMMAND_RESPONSE_VALUE, CommandRequest, CommandRequestTypes, CommandRequestWithParam, CommandResponse, create_is_command, create_value_has_key, isvalue
+from .commands import (
+    CommandRequest,
+    CommandRequestTypes,
+)
 
-from .const import StreamTypes
+from .const import IntStreamTypes
 
 from . import connection, security
 
-class LinkType(Enum):
+
+class LinkType(StrEnum):
     """Link Type"""
 
     STATIC = "Static"
@@ -77,6 +84,7 @@ class P2PInfoType(TypedDict, total=False):
     enable: bool
     uid: str
 
+
 class Network:
     """Network commands Mixin"""
 
@@ -99,11 +107,12 @@ class Network:
         self.__link = None
         self.__ports = None
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetLocalLinkRequest())
+            responses = await self._execute(GetLocalLinkCommand())
         else:
             return None
 
-        link = next(GetLocalLinkRequest.get_responses(responses), None)
+        link = next(map(GetLocalLinkCommand.get_response, filter(
+            GetLocalLinkCommand.is_response, responses)), None)
         if link is not None:
             self.__link = link
         return link
@@ -112,11 +121,12 @@ class Network:
         """Get Channel Statuses Link"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetChannelStatusRequest())
+            responses = await self._execute(GetChannelStatusCommand())
         else:
             return None
 
-        status = next(GetChannelStatusRequest.get_responses(responses), None)
+        status = next(map(GetChannelStatusCommand.get_response, filter(
+            GetChannelStatusCommand.is_response, responses)), None)
         if status is not None:
             return status["status"]
 
@@ -125,11 +135,12 @@ class Network:
 
         self.__ports = None
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetNetworkPortsRequest())
+            responses = await self._execute(GetNetworkPortsCommand())
         else:
             return None
 
-        ports = next(GetNetworkPortsRequest.get_responses(responses), None)
+        ports = next(map(GetNetworkPortsCommand.get_response, filter(
+            GetNetworkPortsCommand.is_response, responses)), None)
         if ports is not None:
             self.__ports = ports
         return ports
@@ -137,34 +148,37 @@ class Network:
     async def _ensure_ports_and_link(self):
         commands = []
         if self.__link is None:
-            commands.append(GetLocalLinkRequest())
+            commands.append(GetLocalLinkCommand())
         if self.__ports is None:
-            commands.append(GetNetworkPortsRequest())
+            commands.append(GetNetworkPortsCommand())
 
         if len(commands) > 0 and isinstance(self, connection.Connection):
             responses = await self._execute(*commands)
         else:
             responses = []
 
-        link = next(GetLocalLinkRequest.get_responses(responses), None)
-        ports = next(GetNetworkPortsRequest.get_responses(responses), None)
+        link = next(map(GetLocalLinkCommand.get_response, filter(
+            GetLocalLinkCommand.is_response, responses)), None)
+        ports = next(map(GetNetworkPortsCommand.get_response, filter(
+            GetNetworkPortsCommand.is_response, responses)), None)
         if link is not None:
             self.__link = link
         if ports is not None:
             self.__ports = ports
 
     async def get_rtsp_url(
-        self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
+        self, channel: int = 0, stream: IntStreamTypes = IntStreamTypes.MAIN
     ):
         """Get RTSP Url"""
 
         if not self.__no_get_rtsp:
             responses = None
             if isinstance(self, connection.Connection):
-                responses = await self._execute(GetRTSPUrlsRequest())
+                responses = await self._execute(GetRTSPUrlsCommand())
 
             if responses is not None:
-                urls = next(GetRTSPUrlsRequest.get_responses(responses), None)
+                urls = next(map(GetRTSPUrlsCommand.get_response, filter(
+                    GetRTSPUrlsCommand.is_response, responses)), None)
                 if not urls is None:
                     url: str = urls[f"{stream.name.lower()}Stream"]
                     # if isinstance(self, security.Security) and self._auth_token != "":
@@ -187,7 +201,7 @@ class Network:
         return url
 
     async def get_rtmp_url(
-        self, channel: int = 0, stream: StreamTypes = StreamTypes.MAIN
+        self, channel: int = 0, stream: IntStreamTypes = IntStreamTypes.MAIN
     ):
         """Get RTMP Url"""
 
@@ -209,97 +223,79 @@ class Network:
         """Get P2P"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetP2PRequest())
+            responses = await self._execute(GetP2PCommand())
         else:
             return None
 
-        return next(GetP2PRequest.get_responses(responses), None)
+        return next(map(GetP2PCommand.get_response, filter(GetP2PCommand.is_response, responses)), None)
 
-class GetLocalLinkResponseValue(TypedDict):
+
+class GetLocalLinkResponseValueType(TypedDict):
     """Get Local Link Response Value"""
 
     LocalLink: LinkInfoType
 
-class GetLocalLinkRequest(CommandRequest):
+
+class GetLocalLinkCommand(CommandRequest):
     """Get Local Link"""
 
-    COMMAND:Final = "GetLocalLink"
-    RESPONSE:Final = "LocalLink"
+    COMMAND: Final = "GetLocalLink"
+    RESPONSE: Final = "LocalLink"
 
-    def __init__(self, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY)->None:
+    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses: Iterable[CommandResponse]):
-        """"Get Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isLocalLink,
-                filter(
-                    isvalue,
-                    filter(
-                        _isLocalLinkCmd,
-                        responses
-                    )
-                )
-            )
+    def is_response(cls, value: any) -> TypeGuard[GetLocalLinkResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetLocalLinkResponseValueType)
         )
 
-
-_isLocalLinkCmd = create_is_command(GetLocalLinkRequest.COMMAND)
-
-_isLocalLink = create_value_has_key(
-    GetLocalLinkRequest.RESPONSE, GetLocalLinkResponseValue
-)
+    @classmethod
+    def get_response(cls, value: GetLocalLinkResponseValueType):
+        """Get Local Link Response"""
+        return value[cls.RESPONSE]
 
 
-class GetChannelStatusResponseValue(TypedDict):
+class GetChannelStatusResponseValueType(TypedDict):
     """Get Channel Status Response Value"""
 
     count: int
     status: list[ChannelStatusType]
 
 
-class GetChannelStatusRequest(CommandRequest):
+class GetChannelStatusCommand(CommandRequest):
     """Get Channel Status"""
 
-    COMMAND:Final = "GetChannelstatus"
-    RESPONSE:Final = "status"
+    COMMAND: Final = "GetChannelstatus"
+    RESPONSE: Final = "status"
 
     def __init__(self, action=CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """ Get ChannelStatus[] Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE],
-            filter(
-                _isChannelStatus,
-                filter(
-                    isvalue,
-                    filter(
-                        _isChannelStatusCmd,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetChannelStatusResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a Channel Status result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetChannelStatusResponseValueType)
         )
 
+    @classmethod
+    def get_response(cls, value: GetChannelStatusResponseValueType):
+        """Get Channel Status Response"""
+        return value[cls.RESPONSE]
 
-_isChannelStatusCmd = create_is_command(GetChannelStatusRequest.COMMAND)
 
-_isChannelStatus = create_value_has_key(
-    GetChannelStatusRequest.RESPONSE, GetChannelStatusResponseValue, list
-)
-
-class GetRTSPUrlCommandResponseValue(TypedDict):
+class GetRTSPUrlCommandResponseValueType(TypedDict):
     """Get RTSP Command Response Value"""
 
     rtspUrl: RTSPUrlsType
 
-class GetRTSPUrlsRequest(CommandRequest):
+
+class GetRTSPUrlsCommand(CommandRequest):
     """Get RTSP URls"""
 
     COMMAND: Final = "GetRtspUrl"
@@ -309,36 +305,26 @@ class GetRTSPUrlsRequest(CommandRequest):
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """ Get RTSP Urls Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isRTSPUrl,
-                filter(
-                    isvalue,
-                    filter(
-                        _isRTSPUrlCmd,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetRTSPUrlCommandResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a RSTP Url result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetRTSPUrlCommandResponseValueType)
         )
 
-
-_isRTSPUrlCmd = create_is_command(GetRTSPUrlsRequest.COMMAND)
-
-_isRTSPUrl = create_value_has_key(
-    GetRTSPUrlsRequest.RESPONSE, GetRTSPUrlCommandResponseValue
-)
+    @classmethod
+    def get_response(cls, value: GetRTSPUrlCommandResponseValueType):
+        """Get RSTP Url Response"""
+        return value[cls.RESPONSE]
 
 
-class GetNetworkPortsCommandResponseValue(TypedDict):
+class GetNetworkPortsCommandResponseValueType(TypedDict):
     """Get Network Ports Command Response Value"""
 
     NetPort: NetworkPortsType
 
-class GetNetworkPortsRequest(CommandRequest):
+
+class GetNetworkPortsCommand(CommandRequest):
     """Get Network Ports"""
 
     COMMAND: Final = "GetNetPort"
@@ -348,59 +334,43 @@ class GetNetworkPortsRequest(CommandRequest):
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """ Get Network Ports Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isNetworkPorts,
-                filter(
-                    isvalue,
-                    filter(
-                        _isNetworkPortsCmd,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetNetworkPortsCommandResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a Network Port result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetNetworkPortsCommandResponseValueType)
         )
 
-_isNetworkPortsCmd = create_is_command(GetNetworkPortsRequest.COMMAND)
+    @classmethod
+    def get_response(cls, value: GetNetworkPortsCommandResponseValueType):
+        """Get Network Port Response"""
+        return value[cls.RESPONSE]
 
-_isNetworkPorts = create_value_has_key(
-    GetNetworkPortsRequest.RESPONSE, GetNetworkPortsCommandResponseValue
-)
 
-class GetP2PResponseValue(TypedDict):
+class GetP2PResponseValueType(TypedDict):
     """Get P2P Response Value"""
 
     P2p: P2PInfoType
 
-class GetP2PRequest(CommandRequest):
+
+class GetP2PCommand(CommandRequest):
     """Get P2P"""
 
     COMMAND: Final = "GetP2p"
-    RESPONSE:Final = "P2p"
+    RESPONSE: Final = "P2p"
 
     def __init__(self, action=CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """ Get Network Ports Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isP2P,
-                filter(
-                    isvalue,
-                    filter(
-                        _isP2PCmd,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetP2PResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a P2P result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetP2PResponseValueType)
         )
 
-_isP2PCmd = create_is_command(GetP2PRequest.COMMAND)
-
-_isP2P = create_value_has_key(GetP2PRequest.RESPONSE, GetP2PResponseValue)
+    @classmethod
+    def get_response(cls, value: GetP2PResponseValueType):
+        """Get P2P Response"""
+        return value[cls.RESPONSE]

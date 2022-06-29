@@ -1,9 +1,11 @@
 """Encoding"""
 
-from typing import Final, Iterable, TypedDict
+from typing import Final, TypedDict
+from typing_extensions import TypeGuard
 
-from .commands import COMMAND, COMMAND_RESPONSE_VALUE, CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponse, create_value_has_key, isvalue
+from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam
 from . import connection
+
 
 class StreamEncodingInfo(TypedDict):
     """Encoding Info"""
@@ -27,6 +29,7 @@ class EncodingInfo(TypedDict):
     subStream: StreamEncodingInfo
     extStream: StreamEncodingInfo
 
+
 class Encoding:
     """Encoding Mixin"""
 
@@ -35,42 +38,33 @@ class Encoding:
 
         if isinstance(self, connection.Connection):
             responses = await self._execute(
-                GetEncodingRequest(channel)
+                GetEncodingCommand(channel)
             )
         else:
             return None
 
-        return next(GetEncodingRequest.get_responses(responses), None)
+        return next(filter(GetEncodingCommand.is_response, responses), None)
 
-class GetEncodingResponseValue(TypedDict):
+
+class GetEncodingResponseValueType(TypedDict):
     """Get Encoding Response Value"""
 
     Enc: EncodingInfo
 
-class GetEncodingRequest(CommandRequestWithParam[CommandChannelParameter]):
-    """Get Encoding"""
-    
-    COMMAND: Final = "GetEnc"
-    RESPONSE:Final = "Enc"
 
-    def __init__(self, channel:int = 0, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY):
+class GetEncodingCommand(CommandRequestWithParam[CommandChannelParameter]):
+    """Get Encoding"""
+
+    COMMAND: Final = "GetEnc"
+    RESPONSE: Final = "Enc"
+
+    def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """Get responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isEncoding,
-                filter(
-                    isvalue,
-                    filter(
-                        lambda response: response[COMMAND] == cls.COMMAND, responses
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetEncodingResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetEncodingResponseValueType)
         )
-
-
-_isEncoding = create_value_has_key(GetEncodingRequest.RESPONSE, GetEncodingResponseValue)

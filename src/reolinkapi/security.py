@@ -5,12 +5,18 @@ from dataclasses import dataclass
 import inspect
 from time import time
 from typing import Callable, Final, Iterable, TypedDict
+from typing_extensions import TypeGuard
 
 from .system import UserInfo
 
 from .const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 
-from .commands import COMMAND, COMMAND_RESPONSE_VALUE, CommandRequest, CommandRequestTypes, CommandRequestWithParam, CommandResponse, create_value_has_key, iserror, isvalue
+from .commands import (
+    CommandRequestTypes,
+    CommandRequest,
+    CommandRequestWithParam,
+    CommandResponseType,
+)
 
 from .errors import ErrorCodes
 
@@ -18,11 +24,13 @@ from . import connection
 
 LOGOUT_CALLBACK_TYPE = Callable[[], None]
 
+
 @dataclass
 class LoginInfo(UserInfo):
     """Login info"""
 
     password: str
+
 
 class LoginTokenType(TypedDict):
     """Login Token"""
@@ -112,11 +120,12 @@ class Security(ABC):
 
     async def _do_login(self, username: str, password: str):
         if isinstance(self, connection.Connection):
-            return await self._execute(LoginRequest(LoginInfo(username, password)))
+            return await self._execute(LoginCommand(LoginInfo(username, password)))
         return []
 
-    def _process_token(self, responses: Iterable[CommandResponse]):
-        token = next(LoginRequest.get_responses(responses), None)
+    def _process_token(self, responses: Iterable[CommandResponseType]):
+        token = next(map(LoginCommand.get_response, filter(
+            LoginCommand.is_response, responses)), None)
         self.__auth_failed = True
         if token is None:
             return False
@@ -145,8 +154,8 @@ class Security(ABC):
                 if self._ensure_connection():
                     errors = list(
                         filter(
-                            iserror,
-                            await self._execute(LogoutRequest()),
+                            LogoutCommand.is_error,
+                            await self._execute(LogoutCommand()),
                         )
                     )
                     if len(errors) > 0:
@@ -161,10 +170,12 @@ class Security(ABC):
         self.__token = ""
         self.__token_expires = 0
 
-class LoginResponseValue(TypedDict):
+
+class LoginResponseValueType(TypedDict):
     """Authentication Login Response Value Token"""
 
     Token: LoginTokenType
+
 
 @dataclass
 class LoginRequestParameter:
@@ -172,52 +183,38 @@ class LoginRequestParameter:
 
     User: LoginInfo
 
-class LoginRequest(CommandRequestWithParam[LoginRequestParameter]):
+
+class LoginCommand(CommandRequestWithParam[LoginRequestParameter]):
     """Login Request"""
 
-    COMMAND:Final = "Login"
-    RESPONSE:Final = "Token"
+    COMMAND: Final = "Login"
+    RESPONSE: Final = "Token"
 
-    def __init__(self, login:LoginInfo, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY)->None:
-        super().__init__(type(self).COMMAND,action, LoginRequestParameter(login))
+    def __init__(self, login: LoginInfo, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
+        super().__init__(type(self).COMMAND, action, LoginRequestParameter(login))
 
     @classmethod
-    def has_auth_failure(cls, responses: Iterable[CommandResponse]):
-        """Check responses for auth failure"""
+    def is_response(cls, value: any) -> TypeGuard[LoginResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
         return (
-            next(
-                (
-                    error
-                    for error in filter(iserror, responses)
-                    if error["error"]["rspCode"] == ErrorCodes.AUTH_REQUIRED
-                ),
-                None,
-            )
-            is not None
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, LoginResponseValueType)
         )
 
     @classmethod
-    def get_responses(cls, responses: Iterable[CommandResponse]):
-        """Get Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _istoken,
-                filter(
-                    isvalue,
-                    filter(lambda response: response[COMMAND] == cls.COMMAND, responses),
-                ),
-            ),
-        )
+    def get_response(cls, value: LoginResponseValueType):
+        """Get Channel Status Response"""
+        return value[cls.RESPONSE]
+
+    @classmethod
+    def is_auth_failure(cls, value: CommandResponseType):
+        return super()._is_response_code(value) and super()._get_response_code(value) == ErrorCodes.AUTH_REQUIRED
 
 
-
-_istoken = create_value_has_key(LoginRequest.RESPONSE, LoginResponseValue)
-
-class LogoutRequest(CommandRequest):
+class LogoutCommand(CommandRequest):
     """Logout Request"""
 
-    COMMAND:Final = "Logout"
+    COMMAND: Final = "Logout"
 
-    def __init__(self, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY):
-        super().__init(type(self).COMMAND, action)
+    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
+        super().__init__(type(self).COMMAND, action)

@@ -5,7 +5,7 @@ from typing import Callable, Iterable
 
 from .const import DEFAULT_TIMEOUT
 
-from .commands import CommandRequest, CommandResponse
+from .commands import CommandRequest, CommandResponseType
 
 DISCONNECT_CALLBACK_TYPE = Callable[[], None]
 
@@ -48,7 +48,7 @@ class Connection(ABC):
         ...
 
     @abstractmethod
-    async def _execute(self, *args: CommandRequest) -> Iterable[CommandResponse]:
+    async def _execute(self, *args: CommandRequest) -> Iterable[CommandResponseType]:
         ...
 
     async def batch(self, commands: Iterable[CommandRequest]):

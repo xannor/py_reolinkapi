@@ -1,12 +1,18 @@
 """AI"""
 
-from enum import Enum
-from typing import Final, Iterable, TypedDict
+from typing import Final, TypedDict
+from typing_extensions import TypeGuard
 
-from .commands import COMMAND, COMMAND_RESPONSE_VALUE, CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponse, create_value_has_key, isvalue
+try:
+    from enum import StrEnum  # pylint: disable=ungrouped-imports
+except ImportError:
+    from backports.strenum import StrEnum
+
+from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam
 from . import connection
 
-class AITypes(str, Enum):
+
+class AITypes(StrEnum):
     """AI Types"""
 
     ANIMAL = "animal"
@@ -16,11 +22,12 @@ class AITypes(str, Enum):
     VEHICLE = "vehicle"
 
 
-class AiAlarmState(TypedDict):
+class AiAlarmStateType(TypedDict):
     """AI Response State"""
 
     alarm_state: int
     support: int
+
 
 class AI:
     """AI Mixin"""
@@ -29,65 +36,54 @@ class AI:
         """Get AI State Info"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetAiStateRequest(channel))
+            responses = await self._execute(GetAiStateCommand(channel))
         else:
             return None
 
-        state = next(GetAiStateRequest.get_responses(responses), None)
+        state = next(filter(GetAiStateCommand.is_response, responses), None)
         return state
 
     async def get_ai_config(self, channel: int = 0):
         """Get AI Config Info"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetAiConfigRequest(channel))
+            responses = await self._execute(GetAiConfigCommand(channel))
         else:
             return None
 
-        config = next(GetAiConfigRequest.get_responses(responses), None)
+        config = next(filter(GetAiConfigCommand.is_response, responses), None)
         return config
 
-class GetAiStateResponseValue(TypedDict, total=False):
+
+class GetAiStateResponseValueType(TypedDict, total=False):
     """Get AI State Response Value"""
 
     channel: int
-    dog_cat: AiAlarmState
-    face: AiAlarmState
-    people: AiAlarmState
-    vehicle: AiAlarmState
+    dog_cat: AiAlarmStateType
+    face: AiAlarmStateType
+    people: AiAlarmStateType
+    vehicle: AiAlarmStateType
 
-class GetAiStateRequest(CommandRequestWithParam[CommandChannelParameter]):
+
+class GetAiStateCommand(CommandRequestWithParam[CommandChannelParameter]):
     """Get AI State"""
 
-    COMMAND:Final = "GetAiState"
-    RESPONSE:Final = "channel"
+    COMMAND: Final = "GetAiState"
+    RESPONSE: Final = "channel"
 
-    def __init__(self, channel:int = 0, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY):
+    def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
-        
+
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """Get responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE],
-            filter(
-                _isAiState,
-                filter(
-                    isvalue,
-                    filter(
-                        lambda response: response[COMMAND] == cls.COMMAND,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetAiStateResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetAiStateResponseValueType)
         )
 
 
-_isAiState = create_value_has_key(
-    GetAiStateRequest.RESPONSE, GetAiStateResponseValue, int
-)
-
-class GetAiConfigResponseValue(TypedDict, total=False):
+class GetAiConfigResponseValueType(TypedDict, total=False):
     """Get AI Config Response Value"""
 
     channel: int
@@ -95,33 +91,20 @@ class GetAiConfigResponseValue(TypedDict, total=False):
     aiTrack: int
     trackType: dict[AITypes, int]
 
-class GetAiConfigRequest(CommandRequestWithParam[CommandChannelParameter]):
+
+class GetAiConfigCommand(CommandRequestWithParam[CommandChannelParameter]):
     """Get AI Config"""
 
-    COMMAND:Final = "GetAiCfg"
-    RESPONSE:Final = "channel"
+    COMMAND: Final = "GetAiCfg"
+    RESPONSE: Final = "channel"
 
-    def __init__(self, channel:int = 0, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY):
+    def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
-        
+
     @classmethod
-    def get_responses(cls, responses:Iterable[CommandResponse]):
-        """Get responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE],
-            filter(
-                _isAiConfig,
-                filter(
-                    isvalue,
-                    filter(
-                        lambda response: response[COMMAND] == cls.COMMAND,
-                        responses,
-                    ),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetAiConfigResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetAiConfigResponseValueType)
         )
-
-
-_isAiConfig = create_value_has_key(
-    GetAiConfigRequest.RESPONSE, GetAiConfigResponseValue, int
-)

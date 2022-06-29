@@ -1,0 +1,3 @@
+typing_extensions
+pytest-asyncio
+backports.strenum

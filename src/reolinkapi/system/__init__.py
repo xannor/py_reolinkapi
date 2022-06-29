@@ -5,12 +5,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from typing import ClassVar, Final, Iterable, TypedDict
+from typing_extensions import TypeGuard
 
-from ..commands import COMMAND_RESPONSE_VALUE, CommandRequest, CommandRequestTypes, CommandRequestWithParam, CommandResponse, create_is_command, create_value_has_key, isvalue
+from ..commands import (
+    CommandRequestTypes,
+    CommandRequest,
+    CommandRequestWithParam,
+)
 
-from .abilities import Abilities, AbilitiesType
+from .abilities import Abilities
 
 from .. import connection
+
 
 @dataclass
 class UserInfo:
@@ -18,7 +24,8 @@ class UserInfo:
 
     userName: str
 
-class DeviceVersions(TypedDict):
+
+class DeviceVersionsType(TypedDict):
     """Device Version Info"""
 
     cfgVer: str
@@ -27,7 +34,7 @@ class DeviceVersions(TypedDict):
     frameworkVer: str
 
 
-class DeviceInfoType(DeviceVersions):
+class DeviceInfoType(DeviceVersionsType):
     """Device Info"""
 
     IOInputNum: int
@@ -46,7 +53,28 @@ class DeviceInfoType(DeviceVersions):
     pakSuffix: str
 
 
-class TimeValue(TypedDict, total=False):
+@dataclass
+class TimeValue:
+    """Time Value"""
+
+    year: int
+    mon: int
+    day: int
+    hour: int
+    min: int
+    sec: int
+
+    def as_datetime(self):
+        """convert to datetime"""
+        return datetime(self.year, self.mon, self.day, self.hour, self.min, self.sec)
+
+    @classmethod
+    def from_datetime(cls, value: datetime):
+        """Create TimeValue from datetime"""
+        return cls(value.year, value.month, value.day, value.hour, value.minute, value.second)
+
+
+class TimeValueType(TypedDict, total=False):
     """Time Value"""
 
     year: int
@@ -83,13 +111,14 @@ class HourFormats(IntEnum):
     TWELVE = 1
 
 
-class TimeValueInfo(TimeValue):
+class TimeValueInfo(TimeValueType):
     """Time Value with additional info"""
 
     timeFmt: str
     timeZone: int
     """Note: this is the offset to get GMT from localtime not the offset from GMT, i.e. -5GMT(ETD) is 18000 """
     hourFmt: int
+
 
 class System:
     """System Commands Mixin"""
@@ -109,31 +138,33 @@ class System:
         """Get User Permisions"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetAbilityRequest(username))
-        else:
-            return None
+            responses = await self._execute(AbilitiesCommand(username))
+            result = next(
+                filter(AbilitiesCommand.is_response, responses), None)
+            if result is not None:
+                return Abilities(result["Ability"])
 
-        return next(GetAbilityRequest.get_responses(responses), None)
+        return Abilities({})
 
     async def get_device_info(self):
         """Get Device Information"""
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetDeviceInfoRequest())
+            responses = await self._execute(GetDeviceInfoCommand())
         else:
             return None
 
-        return next(GetDeviceInfoRequest.get_responses(responses), None)
+        return next(filter(GetDeviceInfoCommand.is_response, responses), None)
 
     async def get_time(self):
         """Get Device Time Information"""
 
         self.__clear()
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetTimeRequest())
+            responses = await self._execute(GetTimeCommand())
         else:
             return None
-        time = next(GetTimeRequest.get_responses(responses), None)
+        time = next(filter(GetTimeCommand.is_response, responses), None)
         if time is not None:
             self.__timeinfo = time["Time"]
             self.__time = as_dateime(
@@ -152,10 +183,12 @@ class System:
         await self.get_time()
         return self.__timeinfo
 
+
 class GetAbilityResponseValue(TypedDict):
     """Get Abilities Resposne Value"""
 
     Ability: dict
+
 
 @dataclass
 class UserInfoRequestParameter:
@@ -163,119 +196,73 @@ class UserInfoRequestParameter:
 
     User: UserInfo
 
-class GetAbilityRequest(CommandRequestWithParam[UserInfoRequestParameter]):
+
+class AbilitiesCommand(CommandRequestWithParam[UserInfoRequestParameter]):
     """Get Abilities"""
 
-    COMMAND:Final = "GetAbility"
-    RESPONSE:Final = "Ability"
+    COMMAND: Final = "GetAbility"
+    RESPONSE: Final = "Ability"
 
-    def __init__(self, user:UserInfo|None=None, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY)->None:
-        super().__init__(type(self).COMMAND, action, UserInfoRequestParameter(user or UserInfo("null")))
+    def __init__(self, user: UserInfo | None = None, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
+        super().__init__(type(self).COMMAND, action,
+                         UserInfoRequestParameter(user or UserInfo("null")))
 
     @classmethod
-    def get_responses(cls, responses: Iterable[CommandResponse]):
-        """get responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isAbilities,
-                filter(
-                    isvalue,
-                    filter(_isAbilitiesCmd, responses),
-                ),
-            ),
+    def is_response(cls, value: any) -> TypeGuard[GetAbilityResponseValue]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetAbilityResponseValue)
         )
 
 
-_isAbilitiesCmd = create_is_command(GetAbilityRequest.COMMAND)
-
-_isAbilities = create_value_has_key(GetAbilityRequest.RESPONSE, GetAbilityResponseValue)
-
-class GetDeviceInfoResponseValue(TypedDict):
+class GetDeviceInfoResponseValueType(TypedDict):
     """Get Device Info Response Value"""
 
     DevInfo: DeviceInfoType
 
-class GetDeviceInfoRequest(CommandRequest):
+
+class GetDeviceInfoCommand(CommandRequest):
     """Get Device Info"""
 
     COMMAND: Final = "GetDevInfo"
     RESPONSE: Final = "DevInfo"
 
-    def __init__(self, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY)->None:
+    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses: Iterable[CommandResponse]):
-        """"Get Responses"""
-        return map(
-            lambda response: _make_abilities(response[COMMAND_RESPONSE_VALUE][cls.RESPONSE]),
-            filter(
-                _isDevInfo,
-                filter(
-                    isvalue,
-                    filter(
-                        _isDevInfoCmd,
-                        responses
-                    )
-                )
-            )
+    def is_response(cls, value: any) -> TypeGuard[GetDeviceInfoResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetDeviceInfoResponseValueType)
         )
 
-def _make_abilities(abilities:dict|None):
-    return Abilities(abilities) if abilities else None
 
-_isDevInfoCmd = create_is_command(GetDeviceInfoRequest.COMMAND)
-
-_isDevInfo = create_value_has_key(GetDeviceInfoRequest.RESPONSE, GetDeviceInfoResponseValue)
-
-class GetTimeCommandResponseValue(TypedDict, total=False):
+class GetTimeCommandResponseValueType(TypedDict, total=False):
     """Get Time Response Value"""
 
     Dst: DaylightSavingsTimeInfo
     Time: TimeValueInfo
 
-class GetTimeRequest(CommandRequest):
+
+class GetTimeCommand(CommandRequest):
     """Get Time"""
 
     COMMAND: Final = "GetTime"
     RESPONSE: Final = "Time"
 
-    def __init__(self, action:CommandRequestTypes=CommandRequestTypes.VALUE_ONLY)->None:
+    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def get_responses(cls, responses: Iterable[CommandResponse]):
-        """"Get Responses"""
-        return map(
-            lambda response: response[COMMAND_RESPONSE_VALUE][cls.RESPONSE],
-            filter(
-                _isTime,
-                filter(
-                    isvalue,
-                    filter(
-                        _isTimeCmd,
-                        responses
-                    )
-                )
-            )
+    def is_response(cls, value: any) -> TypeGuard[GetTimeCommandResponseValueType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, GetTimeCommandResponseValueType)
         )
-
-_isTimeCmd = create_is_command(GetTimeRequest.COMMAND)
-
-_isTime = create_value_has_key(GetTimeRequest.RESPONSE, GetTimeCommandResponseValue)
-
-def as_time_value(value: datetime.datetime):
-    """datetime to TimeValue"""
-
-    return TimeValue(
-        year=value.year,
-        mon=value.month,
-        day=value.day,
-        hour=value.hour,
-        min=value.minute,
-        sec=value.second,
-    )
 
 
 @dataclass
@@ -337,7 +324,8 @@ class _timezone(datetime.tzinfo):
     def get_or_create(cls, dst_info: DaylightSavingsTimeInfo, time_info: TimeValueInfo):
         """Get existing or create new"""
         return cls._cache.setdefault(
-            (dst_info["enable"], time_info["timeZone"]), _timezone(dst_info, time_info)
+            (dst_info["enable"], time_info["timeZone"]
+             ), _timezone(dst_info, time_info)
         )
 
     def tzname(self, __dt: datetime.datetime | None):
@@ -374,7 +362,7 @@ class _timezone(datetime.tzinfo):
         return _ZERO
 
 
-def get_tzinfo(info: GetTimeCommandResponseValue) -> datetime.tzinfo:
+def get_tzinfo(info: GetTimeCommandResponseValueType) -> datetime.tzinfo:
     """Get tzinfo"""
 
     if "Dst" in info:
@@ -382,7 +370,7 @@ def get_tzinfo(info: GetTimeCommandResponseValue) -> datetime.tzinfo:
     return datetime.timezone(datetime.timedelta(seconds=-info["Time"]["timeZone"]))
 
 
-def as_dateime(value: TimeValue, *, tzinfo: datetime.tzinfo | None = None):
+def as_dateime(value: TimeValueType, *, tzinfo: datetime.tzinfo | None = None):
     """TimeValue to datetime"""
 
     return datetime.datetime(

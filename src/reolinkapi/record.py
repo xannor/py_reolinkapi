@@ -1,19 +1,85 @@
 """Record"""
 
-from abc import ABC, abstractmethod
-from . import connection
+from __future__ import annotations
 
-class Search(TypedDict):
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from time import time
+from typing import Final, Iterable, MutableMapping, TypedDict, overload
+from typing_extensions import TypeGuard
+
+from .commands import (
+    CommandChannelParameter,
+    CommandRequestTypes,
+    CommandRequestWithParam,
+    CommandResponseType,
+)
+from . import connection
+from . import system
+
+from .const import StreamTypes
+
+
+@dataclass
+class Search:
     """Search"""
 
     channel: int
-    onlyStatus: int
-    streamType: STREAM_TYPES
-    StartTime: TimeValue
-    EndTime: TimeValue
+    onlyStatus: int  # pylint: disable=invalid-name
+    streamType: StreamTypes  # pylint: disable=invalid-name
+    StartTime: system.TimeValue  # pylint: disable=invalid-name
+    EndTime: system.TimeValue  # pylint: disable=invalid-name
 
 
-class SearchStatus(TypedDict):
+class SearchStatusTable(MutableMapping[int, bool]):
+    """Search Status Table"""
+
+    def __init__(self, table: str = None) -> None:
+        self._table: dict[int, bool] = dict()
+        if table is not None:
+            for (i, _c) in enumerate(table, 1):
+                self._table[i] = _c == "1"
+
+    def __getitem__(self, __k: int):
+        return self._table.__getitem__(__k)
+
+    def __setitem__(self, __k: int, __v: bool) -> None:
+        return self._table.__setitem__(__k, __v)
+
+    def __delitem__(self, __v: int):
+        return self._table.__delitem__(__v)
+
+    def __iter__(self):
+        return self._table.__iter__()
+
+    def __len__(self):
+        return self._table.__len__()
+
+    def __str__(self) -> str:
+        return "".join(("1" if b else "0") for (_, b) in self._table.items())
+
+
+@dataclass
+class SearchStatus(Iterable[date]):
+    """Search Result Status"""
+
+    month: int
+    year: int
+    table: SearchStatusTable
+
+    @classmethod
+    def from_dict(cls, value: SearchStatusType):
+        """Convert results json to class"""
+        return cls(value["mon"], value["year"], SearchStatusTable(value["table"]))
+
+    def __iter__(self):
+        for (i, _b) in self.table.items():
+            if _b:
+                yield date(self.year, self.month, i)
+
+
+class SearchStatusType(TypedDict):
     """Search Result Status"""
 
     mon: int
@@ -21,7 +87,7 @@ class SearchStatus(TypedDict):
     table: str
 
 
-class SearchFile(TypedDict):
+class SearchFileType(TypedDict):
     """Search Result File"""
 
     frameRate: int
@@ -29,17 +95,18 @@ class SearchFile(TypedDict):
     wifth: int
     name: str
     size: int
-    type: STREAM_TYPES
-    StartTime: TimeValue
-    EndTime: TimeValue
+    type: str
+    StartTime: system.TimeValueType
+    EndTime: system.TimeValueType
 
 
-class SearchResults(TypedDict, total=False):
+class SearchResultsType(TypedDict, total=False):
     """Search Results"""
 
     channel: int
-    Status: list[SearchStatus]
-    File: list[SearchFile]
+    Status: list[SearchStatusType]
+    File: list[SearchFileType]
+
 
 class Record(ABC):
     """Record Mixin"""
@@ -47,7 +114,6 @@ class Record(ABC):
     @abstractmethod
     async def get_snap(self, channel: int = 0) -> bytes:
         """get snapshot"""
-        ...
 
     async def _search(
         self,
@@ -55,7 +121,7 @@ class Record(ABC):
         end_time: datetime,
         channel: int,
         only_status: bool,
-        stream_type: STREAM_TYPES,
+        stream_type: StreamTypes,
     ):
         camera_time = None
         if isinstance(self, system.System):
@@ -63,13 +129,15 @@ class Record(ABC):
         tzinfo = camera_time.tzinfo if camera_time is not None else None
 
         if end_time is None:
-            end_time = datetime.combine(datetime.now(tzinfo).date(), time.min, tzinfo)
+            end_time = datetime.combine(
+                datetime.now(tzinfo).date(), time.min, tzinfo)
             end_time += timedelta(days=1, seconds=-1)
         elif end_time.tzinfo is not None:
             end_time = end_time.astimezone(tzinfo)
 
         if start_time is None:
-            start_time = datetime.combine(end_time.date(), time.min, end_time.tzinfo)
+            start_time = datetime.combine(
+                end_time.date(), time.min, end_time.tzinfo)
         elif start_time.tzinfo is not None:
             start_time = start_time.astimezone(tzinfo)
 
@@ -77,18 +145,23 @@ class Record(ABC):
             channel=channel,
             onlyStatus=1 if only_status else 0,
             streamType=stream_type,
-            StartTime=systemHelpers.as_time_value(start_time),
-            EndTime=systemHelpers.as_time_value(end_time),
+            StartTime=system.TimeValue.from_datetime(start_time),
+            EndTime=system.TimeValue.from_datetime(end_time),
         )
         if only_status:
             search["onlyStatus"] = 1
 
         if isinstance(self, connection.Connection):
-            responses = await self._execute(recordHelpers.create_search(search))
+            responses = await self._execute(SearchCommand(search))
         else:
             return None
 
-        return recordHelpers.get_search_responses(responses)
+        if responses is None:
+            return None
+
+        result = next(map(SearchCommand.get_response, filter(
+            SearchCommand.is_response, responses)), None)
+        return result
 
     async def search_status(
         self,
@@ -96,17 +169,13 @@ class Record(ABC):
         *,
         start_time: datetime = None,
         end_time: datetime = None,
-        stream_type: STREAM_TYPES = "main"
+        stream_type: StreamTypes = StreamTypes.MAIN
     ):
         """Perform search but only return available dates in month range"""
         results = await self._search(start_time, end_time, channel, True, stream_type)
         if results is None:
-            return []
-        return list(
-            date
-            for search_results in results
-            for date in recordHelpers.get_search_result_status_dates(search_results)
-        )
+            return SearchStatus(0, 0, SearchStatusTable())
+        return SearchStatus.from_dict(results["Status"])
 
     async def search(
         self,
@@ -114,7 +183,7 @@ class Record(ABC):
         *,
         start_time: datetime = None,
         end_time: datetime = None,
-        stream_type: STREAM_TYPES = "main"
+        stream_type: StreamTypes = StreamTypes.MAIN
     ):
         """Search for recordings in range"""
         results = await self._search(start_time, end_time, channel, False, stream_type)
@@ -122,89 +191,80 @@ class Record(ABC):
             return []
         return list(
             file
-            for search_results in results
-            for file in search_results.get("File", [])
+            for file in results.get("File", [])
         )
 
-SNAPSHOT_COMMAND: Final = "Snap"
+
+class SnapshotCommand(CommandRequestWithParam[CommandChannelParameter]):
+    """Get Snapshot"""
+
+    COMMAND: Final = "Snap"
+
+    def __init__(
+        self,
+        channel: int = 0,
+        requestType: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY
+    ):
+        super().__init__(type(self).COMMAND, requestType, CommandChannelParameter(channel))
 
 
-def create_get_snapshot(channel: int = 0):
-    """Create Get Snapshot Request"""
-
-    return (
-        CommandRequestWithParam(
-            cmd=SNAPSHOT_COMMAND,
-            action=CommandRequestTypes.VALUE_ONLY,
-            param=CommandChannelParameter(channel=channel),
-        ),
-    )
-
-
-class SearchCommandParameter(TypedDict):
+@dataclass
+class SearchCommandParameter:
     """Search Command Parameters"""
 
-    Search: Search
+    Search: Search  # pylint: disable=invalid-name
 
 
-class SearchCommandResponseValue(TypedDict):
+class SearchCommandResponseValueType(TypedDict):
     """Search Command Results"""
 
-    SearchResult: SearchResults
+    SearchResult: SearchResultsType
 
 
-SEARCH_COMMAND: Final = "Search"
+class SearchCommandResponseType(CommandResponseType, total=False):
+    """Search Command Response"""
+
+    value: SearchCommandResponseValueType
 
 
-def create_search(
-    search: Search, _type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY
-):
-    """Create Search Request"""
-    return CommandRequestWithParam(
-        cmd=SEARCH_COMMAND, action=_type, param=SearchCommandParameter(Search=search)
-    )
+class SearchCommand(CommandRequestWithParam[SearchCommandParameter]):
+    """Search Command"""
 
+    COMMAND: Final = "Search"
+    RESPONSE: Final = "SearchResult"
 
-_isSearchCmd = commandHelpers.create_is_command(SEARCH_COMMAND)
+    def __init__(
+        self,
+        search: Search,
+        request_type: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ):
+        super().__init__(type(self).COMMAND, request_type, SearchCommandParameter(search))
 
-_isSearch = commandHelpers.create_value_has_key(
-    "SearchResult", SearchCommandResponseValue
-)
-
-
-def get_search_responses(responses: Iterable[CommandResponse]):
-    """Get Search Result Responses"""
-
-    return map(
-        lambda response: response[COMMAND_RESPONSE_VALUE]["SearchResult"],
-        filter(
-            _isSearch,
-            filter(
-                commandHelpers.isvalue,
-                filter(_isSearchCmd, responses),
-            ),
-        ),
-    )
-
-
-def get_search_result_status_dates(results: SearchResults):
-    """Get the actual dates from the SearchResults Status"""
-
-    statuses = results.get("Status", [])
-
-    table_tuple = (
-        (
-            status["year"],
-            status["mon"],
-            (i for i, c in enumerate(status["table"], 1) if c == "1"),
+    @classmethod
+    def is_response(cls, value: any) -> TypeGuard[SearchCommandResponseType]:  # pylint: disable=arguments-differ
+        """Is response a search result"""
+        return (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, SearchCommandResponseValueType)
         )
-        for status in statuses
-    )
-    table_dates = map(
-        lambda year_month_days: (
-            date(year_month_days[0], year_month_days[1], day)
-            for day in year_month_days[2]
-        ),
-        table_tuple,
-    )
-    return (date for dates in table_dates for date in dates)
+
+    @overload
+    @classmethod
+    def get_response(
+        cls, value: SearchCommandResponseType) -> SearchResultsType: ...
+
+    @overload
+    @classmethod
+    def get_response(
+        cls, value: SearchCommandResponseValueType) -> SearchResultsType: ...
+
+    @classmethod
+    def get_response(cls, value: any):
+        """get search result"""
+        if (
+            super().is_response(value, command=cls.COMMAND)
+            and super()._is_typed_value(value, cls.RESPONSE, SearchCommandResponseValueType)
+        ):
+            rvalue = super()._get_value(value)
+            return rvalue[cls.RESPONSE]  # pylint: disable=unsubscriptable-object
+        return None
