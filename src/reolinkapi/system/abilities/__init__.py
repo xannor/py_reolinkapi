@@ -3,7 +3,7 @@
 from enum import IntEnum
 from typing import Annotated, TypedDict
 
-from .base import Ability, BooleanAbility, BooleanAbilityVers, VideoClipAbility, VideoClipValue
+from .base import Ability, BooleanAbility, VideoClipAbility
 from .channel import ChannelsAbilities
 from .support import SupportAbilities
 
@@ -15,9 +15,10 @@ class TimeValues(IntEnum):
     SUNDAY = 1
     ANYDAY = 2
 
+
 class _TimeAbilitiy(Ability[TimeValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=TimeValues, default=TimeValues.NONE)
+    def __init__(self, ability: dict) -> None:
+        super().__init__(ability, factory=TimeValues, default=TimeValues.NONE)
 
 
 class UpgradeValues(IntEnum):
@@ -29,8 +30,10 @@ class UpgradeValues(IntEnum):
 
 
 class _UpgradeAbilitiy(Ability[UpgradeValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=UpgradeValues, default=UpgradeValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=UpgradeValues,
+                         default=UpgradeValues.NONE, **kwargs)
+
 
 class DDnsValues(IntEnum):
     """DDNS Ability Values"""
@@ -46,9 +49,12 @@ class DDnsValues(IntEnum):
     NOIP = 8
     DYNDNS_NOIP = 9
 
+
 class _DDnsAbilitiy(Ability[DDnsValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=DDnsValues, default=DDnsValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=DDnsValues,
+                         default=DDnsValues.NONE, **kwargs)
+
 
 class EmailValues(IntEnum):
     """Email Ability Values"""
@@ -58,9 +64,12 @@ class EmailValues(IntEnum):
     VIDEO_JPEG = 2
     VIDEO_JPEG_NICK = 3
 
+
 class _EmailAbilitiy(Ability[EmailValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=EmailValues, default=EmailValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=EmailValues,
+                         default=EmailValues.NONE, **kwargs)
+
 
 class VersionValues(IntEnum):
     """Version Ability Values"""
@@ -68,14 +77,19 @@ class VersionValues(IntEnum):
     BASIC = 0
     V20 = 1
 
+
 class _VersionAbilitiy(Ability[VersionValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=VersionValues, default=VersionValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=VersionValues,
+                         default=VersionValues.BASIC, **kwargs)
+
 
 class _Abilities:
 
-    def __init__(self, abilities:dict)-> None:
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._abilities = abilities
+
 
 class _AlarmHddAbilities(_Abilities):
     @property
@@ -127,6 +141,7 @@ class _FTPAbilities(_Abilities):
     @property
     def autoDirectory(self):
         return BooleanAbility(self._abilities.get("ftpAutoDir", {}))
+
 
 class _RecordAbilities(_Abilities):
 

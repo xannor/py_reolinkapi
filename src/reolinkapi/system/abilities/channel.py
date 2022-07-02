@@ -3,7 +3,7 @@
 from enum import IntEnum
 from typing import Sequence, SupportsIndex
 
-from .base import Ability, BooleanAbility, BooleanAbilityVers, VideoClipAbility
+from .base import Ability, BooleanAbility, VideoClipAbility
 from . import support
 
 
@@ -14,9 +14,11 @@ class OsdValues(IntEnum):
     SUPPORTED = 1
     DISTINCT = 2
 
+
 class _OsdAbilitiy(Ability[OsdValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=OsdValues, default=OsdValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=OsdValues, default=OsdValues.NONE, **kwargs)
+
 
 class LiveValues(IntEnum):
     """Live Ability Values"""
@@ -25,9 +27,11 @@ class LiveValues(IntEnum):
     MAIN_EXTERN_SUB = 1
     MAIN_SUB = 2
 
+
 class _LiveAbility(Ability[LiveValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=LiveValues, default=LiveValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=LiveValues,
+                         default=LiveValues.NONE, **kwargs)
 
 
 class FtpValues(IntEnum):
@@ -41,9 +45,10 @@ class FtpValues(IntEnum):
     STREAM_MODE_TYPE = 5
     JPEG_STREAM_MODE_TYPE = 6
 
+
 class _FtpAbility(Ability[FtpValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=FtpValues, default=FtpValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=FtpValues, default=FtpValues.NONE, **kwargs)
 
 
 class EncodingTypeValues(IntEnum):
@@ -52,9 +57,11 @@ class EncodingTypeValues(IntEnum):
     H264 = 0
     H265 = 1
 
+
 class _EncodingTypeAbility(Ability[EncodingTypeValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=EncodingTypeValues, default=EncodingTypeValues.H264)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=EncodingTypeValues,
+                         default=EncodingTypeValues.H264, **kwargs)
 
 
 class FloodLightValues(IntEnum):
@@ -64,9 +71,11 @@ class FloodLightValues(IntEnum):
     WHITE = 1
     AUTO = 2
 
+
 class _FloodLightAbility(Ability[FloodLightValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=FloodLightValues, default=FloodLightValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=FloodLightValues,
+                         default=FloodLightValues.NONE, **kwargs)
 
 
 class PTZTypeValues(IntEnum):
@@ -79,9 +88,11 @@ class PTZTypeValues(IntEnum):
     BALL = 4
     PTZ_NO_SPEED = 5
 
+
 class _PTZTypeAbility(Ability[PTZTypeValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=PTZTypeValues, default=PTZTypeValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=PTZTypeValues,
+                         default=PTZTypeValues.NONE, **kwargs)
 
 
 class PTZControlValues(IntEnum):
@@ -91,9 +102,11 @@ class PTZControlValues(IntEnum):
     ZOOM = 1
     ZOOM_FOCUS = 2
 
+
 class _PTZControlAbility(Ability[PTZControlValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=PTZControlValues, default=PTZControlValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=PTZControlValues,
+                         default=PTZControlValues.NONE, **kwargs)
 
 
 class PTZDirectionValues(IntEnum):
@@ -102,20 +115,25 @@ class PTZDirectionValues(IntEnum):
     AUTOSCAN_8 = 0
     NO_AUTOACAN_4 = 1
 
+
 class _PTZDirectionAbility(Ability[PTZDirectionValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=PTZDirectionValues, default=PTZDirectionValues.AUTOSCAN_8)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=PTZDirectionValues,
+                         default=PTZDirectionValues.AUTOSCAN_8, **kwargs)
+
 
 class _Abilities:
-    def __init__(self, abilities:dict) -> None:
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._abilities = abilities
+
 
 class _PTZAbilities(_Abilities):
 
     @property
     def type(self):
         return _PTZTypeAbility(self._abilities.get("ptzType", {}))
-    
+
     @property
     def control(self):
         return _PTZControlAbility(self._abilities.get("ptzCtrl", {}))
@@ -146,8 +164,10 @@ class RecordScheduleValues(IntEnum):
 
 
 class _RecordScheduleAbility(Ability[RecordScheduleValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=RecordScheduleValues, default=RecordScheduleValues.NONE)
+    def __init__(self, ability: dict) -> None:
+        super().__init__(ability, factory=RecordScheduleValues,
+                         default=RecordScheduleValues.NONE)
+
 
 class _RecordAbilities(_Abilities):
 
@@ -198,13 +218,16 @@ class DayNightValues(IntEnum):
     DAY_NIGHT = 1
     THRESHOLD = 2
 
+
 class _DayNightAbility(Ability[DayNightValues]):
-    def __init__(self, source: dict) -> None:
-        super().__init__(source, factory=DayNightValues, default=DayNightValues.NONE)
+    def __init__(self, ability: dict, **kwargs) -> None:
+        super().__init__(ability=ability, factory=DayNightValues,
+                         default=DayNightValues.NONE, **kwargs)
+
 
 class _ISPAbilities(_Abilities, BooleanAbility):
-    def __init__(self, abilities: dict,**kwargs) -> None:
-        super().__init__(abilities=abilities,ability=abilities.get("isp", {}),**kwargs)
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        super().__init__(abilities=abilities, ability=abilities.get("isp", {}), **kwargs)
 
     @property
     def dayNight(self):
@@ -258,6 +281,7 @@ class _ISPAbilities(_Abilities, BooleanAbility):
     def sharpness(self):
         return BooleanAbility(self._abilities.get("ispSharpen", {}))
 
+
 class _MotionTriggerAbilities(_Abilities):
     @property
     def audio(self):
@@ -267,10 +291,12 @@ class _MotionTriggerAbilities(_Abilities):
     def record(self):
         return BooleanAbility(self._abilities.get("mdTriggerRecord", {}))
 
+
 class _MotionAbilities(_Abilities):
     @property
     def trigger(self):
         return _MotionTriggerAbilities(self._abilities)
+
 
 class _SupportAbilities(_Abilities):
     @property
@@ -397,11 +423,11 @@ class _ChannelAbilities(_Abilities):
 
 
 class ChannelsAbilities(Sequence[_ChannelAbilities]):
-    def __init__(self, source:list) -> None:
-        self._data = source
+    def __init__(self, ability: list) -> None:
+        self._data = ability
 
     def __len__(self) -> int:
         return self._data.__len__()
 
-    def __getitem__(self, __k:SupportsIndex):
+    def __getitem__(self, __k: SupportsIndex):
         return self._data[__k]

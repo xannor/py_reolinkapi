@@ -2,26 +2,30 @@
 
 from .base import BooleanAbility
 
+
 class _Abilities:
-    def __init__(self, abilities:dict) -> None:
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._abilities = abilities
 
-class _AudioAlarmAbilities(_Abilities,BooleanAbility):
-    def __init__(self, abilities: dict,**kwargs) -> None:
-        super().__init__(abilities=abilities,ability=abilities.get("supportAudioAlarm", {}),**kwargs)
-        
+
+class _AudioAlarmAbilities(_Abilities, BooleanAbility):
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        super().__init__(abilities=abilities, ability=abilities.get(
+            "supportAudioAlarm", {}), **kwargs)
+
     @property
     def enable(self):
         return BooleanAbility(self._abilities.get("supportAudioAlarmEnable", {}))
-        
+
     @property
     def schedule(self):
         return BooleanAbility(self._abilities.get("supportAudioAlarmSchedule", {}))
-        
+
     @property
     def taskEnable(self):
         return BooleanAbility(self._abilities.get("supportAudioAlarmTaskEnable", {}))
-    
+
 
 class _AudioAbilities(_Abilities):
     @property
@@ -32,8 +36,9 @@ class _AudioAbilities(_Abilities):
 class AIAbilities(_Abilities, BooleanAbility):
     """AI Abilities"""
 
-    def __init__(self, abilities: dict,**kwargs) -> None:
-        super().__init__(abilities=abilities,ability=abilities.get("supportAi", {}), factory=bool,default=False,**kwargs)
+    def __init__(self, abilities: dict, **kwargs) -> None:
+        kwargs["ability"] = abilities.get("supportAi", {})
+        super().__init__(abilities, **kwargs)
 
     @property
     def animal(self):
@@ -93,10 +98,10 @@ class FloodlightAbilities(_Abilities):
     def schedule(self):
         return BooleanAbility(self._abilities.get("supportFLSchedule", {}))
 
-
     @property
     def switch(self):
         return BooleanAbility(self._abilities.get("supportFLSwitch", {}))
+
 
 class _FTPAbilities(_Abilities):
     @property
