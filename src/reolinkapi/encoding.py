@@ -3,11 +3,15 @@
 from typing import Final, TypedDict
 from typing_extensions import TypeGuard
 
-from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam
+from .utils import afilter, amap, anext
+
+from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponseValue
 from . import connection
 
+from .typing import OnOffState
 
-class StreamEncodingInfo(TypedDict):
+
+class StreamEncodingInfoType(TypedDict):
     """Encoding Info"""
 
     bitRate: int
@@ -20,14 +24,14 @@ class StreamEncodingInfo(TypedDict):
     vType: str
 
 
-class EncodingInfo(TypedDict):
+class EncodingInfoType(TypedDict):
     """Encoding Info"""
 
-    audio: bool
+    audio: OnOffState
     channel: int
-    mainStream: StreamEncodingInfo
-    subStream: StreamEncodingInfo
-    extStream: StreamEncodingInfo
+    mainStream: StreamEncodingInfoType
+    subStream: StreamEncodingInfoType
+    extStream: StreamEncodingInfoType
 
 
 class Encoding:
@@ -36,20 +40,33 @@ class Encoding:
     async def get_encoding(self, channel: int = 0):
         """Get Encoding Info"""
 
+        Command = GetEncodingCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(
-                GetEncodingCommand(channel)
-            )
+            responses = connection.async_trap_errors(await self._execute(
+                Command(channel)
+            ))
         else:
             return None
 
-        return next(filter(GetEncodingCommand.is_response, responses), None)
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
+
+        return result
 
 
 class GetEncodingResponseValueType(TypedDict):
     """Get Encoding Response Value"""
 
-    Enc: EncodingInfo
+    Enc: EncodingInfoType
 
 
 class GetEncodingCommand(CommandRequestWithParam[CommandChannelParameter]):
@@ -62,9 +79,16 @@ class GetEncodingCommand(CommandRequestWithParam[CommandChannelParameter]):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetEncodingResponseValueType]:  # pylint: disable=arguments-differ
+    def is_response(cls, value: any) -> TypeGuard[CommandResponseValue[GetEncodingResponseValueType]]:  # pylint: disable=arguments-differ
         """Is response a search result"""
         return (
             super().is_response(value, command=cls.COMMAND)
             and super()._is_typed_value(value, cls.RESPONSE, GetEncodingResponseValueType)
         )
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetEncodingResponseValueType]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]

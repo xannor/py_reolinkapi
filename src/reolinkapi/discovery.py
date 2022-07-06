@@ -2,24 +2,29 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import field
+from dataclasses import dataclass, field
 import logging
 import socket
 from struct import pack
 from typing import Final, TypedDict
 from typing_extensions import NotRequired
 
-from attr import dataclass
-
 _LOGGER = logging.getLogger(__name__)
 
-PORT:Final = 3000
-PING:Final = 2000
+PORT: Final = 3000
+PING: Final = 2000
 
 # the cameras expect this value and reply with it as a checksum
-PING_MESSAGE:Final = pack("!L", 0xAAAA0000)
+PING_MESSAGE: Final = pack("!L", 0xAAAA0000)
 
-@dataclass
+
+def _istr(value: any):
+    if not value:
+        return None
+    return str(value).lower()
+
+
+@dataclass(frozen=True)
 class Device:
     """Discovered Device"""
 
@@ -28,6 +33,21 @@ class Device:
     name: str | None = field(default=None)
     ident: str | None = field(default=None)
     uuid: str | None = field(default=None)
+
+    def __post_init__(self):
+        object.__setattr__(self, "mac", _istr(self.mac))
+        object.__setattr__(self, "uuid", _istr(self.uuid))
+
+    def same_as(self, other: Device | DeviceType):
+        """simple comparison"""
+        if isinstance(other, dict):
+            return (
+                self.uuid is not None and self.uuid == _istr(other.get("uuid", None))
+            ) or self.mac == _istr(other.get("mac", None))
+
+        return (
+            self.uuid is not None and self.uuid == other.uuid
+        ) or self.mac == other.mac
 
 
 class DeviceType(TypedDict):
@@ -38,6 +58,7 @@ class DeviceType(TypedDict):
     name: NotRequired[str]
     ident: NotRequired[str]
     uuid: NotRequired[str]
+
 
 def _nulltermstring(value: bytes, offset: int, maxlength: int = None) -> str | None:
     idx = value.index(0, offset)
@@ -128,4 +149,3 @@ class Protocol(asyncio.DatagramProtocol):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.sendto(PING_MESSAGE, (address, port))
-

@@ -17,7 +17,9 @@ class OsdValues(IntEnum):
 
 class _OsdAbilitiy(Ability[OsdValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=OsdValues, default=OsdValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=OsdValues, default=OsdValues.NONE, **kwargs
+        )
 
 
 class LiveValues(IntEnum):
@@ -30,8 +32,9 @@ class LiveValues(IntEnum):
 
 class _LiveAbility(Ability[LiveValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=LiveValues,
-                         default=LiveValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=LiveValues, default=LiveValues.NONE, **kwargs
+        )
 
 
 class FtpValues(IntEnum):
@@ -48,7 +51,9 @@ class FtpValues(IntEnum):
 
 class _FtpAbility(Ability[FtpValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=FtpValues, default=FtpValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=FtpValues, default=FtpValues.NONE, **kwargs
+        )
 
 
 class EncodingTypeValues(IntEnum):
@@ -60,8 +65,12 @@ class EncodingTypeValues(IntEnum):
 
 class _EncodingTypeAbility(Ability[EncodingTypeValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=EncodingTypeValues,
-                         default=EncodingTypeValues.H264, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=EncodingTypeValues,
+            default=EncodingTypeValues.H264,
+            **kwargs
+        )
 
 
 class FloodLightValues(IntEnum):
@@ -74,8 +83,12 @@ class FloodLightValues(IntEnum):
 
 class _FloodLightAbility(Ability[FloodLightValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=FloodLightValues,
-                         default=FloodLightValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=FloodLightValues,
+            default=FloodLightValues.NONE,
+            **kwargs
+        )
 
 
 class PTZTypeValues(IntEnum):
@@ -91,8 +104,9 @@ class PTZTypeValues(IntEnum):
 
 class _PTZTypeAbility(Ability[PTZTypeValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=PTZTypeValues,
-                         default=PTZTypeValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=PTZTypeValues, default=PTZTypeValues.NONE, **kwargs
+        )
 
 
 class PTZControlValues(IntEnum):
@@ -105,8 +119,12 @@ class PTZControlValues(IntEnum):
 
 class _PTZControlAbility(Ability[PTZControlValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=PTZControlValues,
-                         default=PTZControlValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=PTZControlValues,
+            default=PTZControlValues.NONE,
+            **kwargs
+        )
 
 
 class PTZDirectionValues(IntEnum):
@@ -118,8 +136,12 @@ class PTZDirectionValues(IntEnum):
 
 class _PTZDirectionAbility(Ability[PTZDirectionValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=PTZDirectionValues,
-                         default=PTZDirectionValues.AUTOSCAN_8, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=PTZDirectionValues,
+            default=PTZDirectionValues.AUTOSCAN_8,
+            **kwargs
+        )
 
 
 class _Abilities:
@@ -129,7 +151,6 @@ class _Abilities:
 
 
 class _PTZAbilities(_Abilities):
-
     @property
     def type(self):
         return _PTZTypeAbility(self._abilities.get("ptzType", {}))
@@ -165,12 +186,12 @@ class RecordScheduleValues(IntEnum):
 
 class _RecordScheduleAbility(Ability[RecordScheduleValues]):
     def __init__(self, ability: dict) -> None:
-        super().__init__(ability, factory=RecordScheduleValues,
-                         default=RecordScheduleValues.NONE)
+        super().__init__(
+            ability, factory=RecordScheduleValues, default=RecordScheduleValues.NONE
+        )
 
 
 class _RecordAbilities(_Abilities):
-
     @property
     def configure(self):
         return BooleanAbility(self._abilities.get("recCfg", {}))
@@ -189,7 +210,6 @@ class _RecordAbilities(_Abilities):
 
 
 class _AlarmAbilities(_Abilities):
-
     @property
     def ioIn(self):
         return BooleanAbility(self._abilities.get("alarmIoIn", {}))
@@ -221,13 +241,19 @@ class DayNightValues(IntEnum):
 
 class _DayNightAbility(Ability[DayNightValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=DayNightValues,
-                         default=DayNightValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=DayNightValues,
+            default=DayNightValues.NONE,
+            **kwargs
+        )
 
 
 class _ISPAbilities(_Abilities, BooleanAbility):
     def __init__(self, abilities: dict, **kwargs) -> None:
-        super().__init__(abilities=abilities, ability=abilities.get("isp", {}), **kwargs)
+        super().__init__(
+            abilities=abilities, ability=abilities.get("isp", {}), **kwargs
+        )
 
     @property
     def dayNight(self):
@@ -423,6 +449,8 @@ class _ChannelAbilities(_Abilities):
 
 
 class ChannelsAbilities(Sequence[_ChannelAbilities]):
+    """Channel Abilities"""
+
     def __init__(self, ability: list) -> None:
         self._data = ability
 
@@ -430,4 +458,4 @@ class ChannelsAbilities(Sequence[_ChannelAbilities]):
         return self._data.__len__()
 
     def __getitem__(self, __k: SupportsIndex):
-        return self._data[__k]
+        return _ChannelAbilities(abilities=self._data[__k])

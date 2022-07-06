@@ -11,8 +11,11 @@ class _Abilities:
 
 class _AudioAlarmAbilities(_Abilities, BooleanAbility):
     def __init__(self, abilities: dict, **kwargs) -> None:
-        super().__init__(abilities=abilities, ability=abilities.get(
-            "supportAudioAlarm", {}), **kwargs)
+        super().__init__(
+            abilities=abilities,
+            ability=abilities.get("supportAudioAlarm", {}),
+            **kwargs
+        )
 
     @property
     def enable(self):
@@ -37,8 +40,7 @@ class AIAbilities(_Abilities, BooleanAbility):
     """AI Abilities"""
 
     def __init__(self, abilities: dict, **kwargs) -> None:
-        kwargs["ability"] = abilities.get("supportAi", {})
-        super().__init__(abilities, **kwargs)
+        super().__init__(abilities, ability=abilities.get("supportAi", {}), **kwargs)
 
     @property
     def animal(self):

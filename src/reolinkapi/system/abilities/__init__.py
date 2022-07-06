@@ -31,8 +31,9 @@ class UpgradeValues(IntEnum):
 
 class _UpgradeAbilitiy(Ability[UpgradeValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=UpgradeValues,
-                         default=UpgradeValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=UpgradeValues, default=UpgradeValues.NONE, **kwargs
+        )
 
 
 class DDnsValues(IntEnum):
@@ -52,8 +53,9 @@ class DDnsValues(IntEnum):
 
 class _DDnsAbilitiy(Ability[DDnsValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=DDnsValues,
-                         default=DDnsValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=DDnsValues, default=DDnsValues.NONE, **kwargs
+        )
 
 
 class EmailValues(IntEnum):
@@ -67,8 +69,9 @@ class EmailValues(IntEnum):
 
 class _EmailAbilitiy(Ability[EmailValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=EmailValues,
-                         default=EmailValues.NONE, **kwargs)
+        super().__init__(
+            ability=ability, factory=EmailValues, default=EmailValues.NONE, **kwargs
+        )
 
 
 class VersionValues(IntEnum):
@@ -80,12 +83,15 @@ class VersionValues(IntEnum):
 
 class _VersionAbilitiy(Ability[VersionValues]):
     def __init__(self, ability: dict, **kwargs) -> None:
-        super().__init__(ability=ability, factory=VersionValues,
-                         default=VersionValues.BASIC, **kwargs)
+        super().__init__(
+            ability=ability,
+            factory=VersionValues,
+            default=VersionValues.BASIC,
+            **kwargs
+        )
 
 
 class _Abilities:
-
     def __init__(self, abilities: dict, **kwargs) -> None:
         super().__init__(**kwargs)
         self._abilities = abilities
@@ -102,7 +108,6 @@ class _AlarmHddAbilities(_Abilities):
 
 
 class _AlarmAbilities(_Abilities):
-
     @property
     def hdd(self):
         return _AlarmHddAbilities(self._abilities)
@@ -121,7 +126,6 @@ class _AlarmAbilities(_Abilities):
 
 
 class _FTPAbilities(_Abilities):
-
     @property
     def test(self):
         return BooleanAbility(self._abilities.get("ftpTest", {}))
@@ -144,7 +148,6 @@ class _FTPAbilities(_Abilities):
 
 
 class _RecordAbilities(_Abilities):
-
     @property
     def overwrite(self):
         return BooleanAbility(self._abilities.get("recOverWrite", {}))
@@ -163,7 +166,6 @@ class _RecordAbilities(_Abilities):
 
 
 class Abilities(_Abilities):
-
     @property
     def alarm(self):
         return _AlarmAbilities(self._abilities)

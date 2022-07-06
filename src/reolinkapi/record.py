@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from time import time
-from typing import Final, Iterable, MutableMapping, TypedDict, overload
+from typing import Final, Iterable, MutableMapping, TypedDict
 from typing_extensions import TypeGuard
+
+from .errors import ReolinkStreamResponseError
+
+from .typing import StreamReader
+
+from .utils import anext, afilter, amap, alist
+
 
 from .commands import (
     CommandChannelParameter,
     CommandRequestTypes,
     CommandRequestWithParam,
     CommandResponseType,
+    CommandResponseValue
 )
 from . import connection
 from . import system
@@ -108,12 +115,27 @@ class SearchResultsType(TypedDict, total=False):
     File: list[SearchFileType]
 
 
-class Record(ABC):
+class Record:
     """Record Mixin"""
 
-    @abstractmethod
-    async def get_snap(self, channel: int = 0) -> bytes:
+    async def get_snap(self, channel: int = 0):
         """get snapshot"""
+
+        if not isinstance(self, connection.Connection):
+            return None
+
+        response = await self._execute(  # pylint: disable=no-member
+            SnapshotCommand(channel),
+        )
+
+        if response is None:
+            return None
+
+        if not isinstance(response, StreamReader):
+            await alist(connection.async_trap_errors(response))
+            raise ReolinkStreamResponseError()
+
+        return await response.read()
 
     async def _search(
         self,
@@ -151,17 +173,20 @@ class Record(ABC):
         if only_status:
             search["onlyStatus"] = 1
 
-        if isinstance(self, connection.Connection):
-            responses = await self._execute(SearchCommand(search))
-        else:
+        if not isinstance(self, connection.Connection):
             return None
 
-        if responses is None:
-            return None
+        responses = connection.async_trap_errors(await self._execute(  # pylint: disable=no-member
+            SearchCommand(search)
+        ))
 
-        result = next(map(SearchCommand.get_response, filter(
-            SearchCommand.is_response, responses)), None)
-        return result
+        return await anext(
+            amap(
+                SearchCommand.get_value,
+                afilter(SearchCommand.is_response, responses)
+            ),
+            None
+        )
 
     async def search_status(
         self,
@@ -241,30 +266,16 @@ class SearchCommand(CommandRequestWithParam[SearchCommandParameter]):
         super().__init__(type(self).COMMAND, request_type, SearchCommandParameter(search))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[SearchCommandResponseType]:  # pylint: disable=arguments-differ
+    def is_response(cls, value: any) -> TypeGuard[CommandResponseValue[SearchCommandResponseValueType]]:  # pylint: disable=arguments-differ
         """Is response a search result"""
         return (
             super().is_response(value, command=cls.COMMAND)
             and super()._is_typed_value(value, cls.RESPONSE, SearchCommandResponseValueType)
         )
 
-    @overload
     @classmethod
-    def get_response(
-        cls, value: SearchCommandResponseType) -> SearchResultsType: ...
-
-    @overload
-    @classmethod
-    def get_response(
-        cls, value: SearchCommandResponseValueType) -> SearchResultsType: ...
-
-    @classmethod
-    def get_response(cls, value: any):
-        """get search result"""
-        if (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, SearchCommandResponseValueType)
-        ):
-            rvalue = super()._get_value(value)
-            return rvalue[cls.RESPONSE]  # pylint: disable=unsubscriptable-object
-        return None
+    def get_value(cls, value: CommandResponseValue[SearchCommandResponseValueType]):
+        """Get Channel Status Response"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]

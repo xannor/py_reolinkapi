@@ -3,10 +3,16 @@
 from typing import Final, TypedDict
 from typing_extensions import TypeGuard
 
+from .utils import afilter, amap, anext
+
+
+from .typing import OnOffState
+
 from .commands import (
     CommandChannelParameter,
     CommandRequestTypes,
     CommandRequestWithParam,
+    CommandResponseValue,
 )
 from . import connection
 
@@ -17,14 +23,29 @@ class Alarm:
     async def get_md_state(self, channel: int = 0):
         """Get AI State Info"""
 
+        Command = GetMotionStateCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetMotionStateCommand(channel))
+            responses = connection.async_trap_errors(await self._execute(
+                Command(channel)
+            ))
         else:
             return None
 
-        state = next(
-            filter(GetMotionStateCommand.is_response, responses), None)
-        return state
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
+
+        if result is not None:
+            return OnOffState(result)
+        return None
 
 
 class GetMdStateResponseValueType(TypedDict):
@@ -39,13 +60,25 @@ class GetMotionStateCommand(CommandRequestWithParam[CommandChannelParameter]):
     COMMAND: Final = "GetMdState"
     RESPONSE: Final = "state"
 
-    def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
+    def __init__(
+        self,
+        channel: int = 0,
+        action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetMdStateResponseValueType]:  # pylint: disable=arguments-differ
+    def is_response(  # pylint: disable=arguments-differ
+        cls, value: any
+    ) -> TypeGuard[CommandResponseValue[GetMdStateResponseValueType]]:
         """Is response a search result"""
-        return (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, GetMdStateResponseValueType)
-        )
+        return super().is_response(
+            value, command=cls.COMMAND
+        ) and super()._is_typed_value(value, cls.RESPONSE, GetMdStateResponseValueType)
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetMdStateResponseValueType]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]

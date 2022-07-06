@@ -1,6 +1,9 @@
 """Common Errors"""
 
+from __future__ import annotations
+
 from enum import Enum
+from typing import Final
 
 
 class ErrorCode(int):
@@ -110,14 +113,47 @@ class ErrorCodes(ErrorCode, Enum):
 class ReolinkError(Exception):
     """Base Error Class"""
 
+
 class ReolinkConnectionError(ReolinkError):
     """ReoLink Connection Error"""
+
 
 class ReolinkTimeoutError(ReolinkError):
     """Reolink Operation Timeout"""
 
+
 class ReolinkResponseError(ReolinkError):
     """Reolink Response Error"""
+
+    def __init__(
+        self, *args: object, code: ErrorCodes | None = None, details: str | None = None
+    ) -> None:
+        super().__init__(*args)
+        self._code = code
+        self._details = details
+
+    @property
+    def code(self):
+        return self._code
+
+    @property
+    def details(self):
+        return self._details
+
+
+class ReolinkStreamResponseError(ReolinkResponseError):
+    """Reolink Stream Response  Error"""
+
+    DEFAULT_DETAILS: Final = "Expected a stream response"
+
+    def __init__(
+        self,
+        *args: object,
+        code: ErrorCodes = ErrorCodes.READ_FAILED,
+        details: str = DEFAULT_DETAILS,
+    ) -> None:
+        super().__init__(*args, code=code, details=details)
+
 
 class ReolinkUnhandledError(ReolinkError):
     """Reolink Unhandled Expcetion"""

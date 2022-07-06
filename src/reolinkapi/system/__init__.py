@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+import datetime
 from enum import IntEnum
 from typing import ClassVar, Final, Iterable, TypedDict
 from typing_extensions import TypeGuard
+
+from ..utils import afilter, amap, anext
 
 from ..commands import (
     CommandRequestTypes,
     CommandRequest,
     CommandRequestWithParam,
+    CommandResponseValue,
 )
 
 from .abilities import Abilities
@@ -19,10 +22,10 @@ from .. import connection
 
 
 @dataclass
-class UserInfo:
+class User:
     """User Info"""
 
-    userName: str
+    userName: str  # pylint: disable=invalid-name
 
 
 class DeviceVersionsType(TypedDict):
@@ -66,12 +69,16 @@ class TimeValue:
 
     def as_datetime(self):
         """convert to datetime"""
-        return datetime(self.year, self.mon, self.day, self.hour, self.min, self.sec)
+        return datetime.datetime(
+            self.year, self.mon, self.day, self.hour, self.min, self.sec
+        )
 
     @classmethod
     def from_datetime(cls, value: datetime):
         """Create TimeValue from datetime"""
-        return cls(value.year, value.month, value.day, value.hour, value.minute, value.second)
+        return cls(
+            value.year, value.month, value.day, value.hour, value.minute, value.second
+        )
 
 
 class TimeValueType(TypedDict, total=False):
@@ -125,62 +132,114 @@ class System:
 
     def __init__(self) -> None:
         self.__timeinfo: TimeValueInfo | None = None
-        self.__time: datetime | None = None
+        self.__time: datetime.datetime | None = None
+        self.__abilities: Abilities | None = None
 
         if isinstance(self, connection.Connection):
             self._disconnect_callbacks.append(self.__clear)
 
     def __clear(self):
+        self.__abilities = None
         self.__timeinfo = None
         self.__time = None
 
     async def get_ability(self, username: str | None = None):
         """Get User Permisions"""
 
+        if username is None:
+            self.__abilities = None
+
+        Command = GetAbilitiesCommand
         if isinstance(self, connection.Connection):
-            responses = await self._execute(AbilitiesCommand(username))
-            result = next(
-                filter(AbilitiesCommand.is_response, responses), None)
-            if result is not None:
-                return Abilities(result["Ability"])
+            responses = connection.async_trap_errors(await self._execute(
+                Command(User(username) if username else None)
+            ))
+
+            result = await anext(
+                amap(
+                    Command.get_value,
+                    afilter(
+                        Command.is_response,
+                        responses
+                    )
+                ),
+                None,
+            )
+
+            if result:
+                abilities = Abilities(result)
+                if username is None:
+                    self.__abilities = abilities
+                return abilities
 
         return Abilities({})
+
+    async def _ensure_abilities(self):
+        if self.__abilities:
+            return self.__abilities
+        return await self.get_ability()
 
     async def get_device_info(self):
         """Get Device Information"""
 
+        Command = GetDeviceInfoCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetDeviceInfoCommand())
+            responses = connection.async_trap_errors(await self._execute(Command()))
         else:
             return None
 
-        return next(filter(GetDeviceInfoCommand.is_response, responses), None)
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
+
+        return result
 
     async def get_time(self):
         """Get Device Time Information"""
 
-        self.__clear()
+        self.__timeinfo = None
+        self.__time = None
+
+        Command = GetTimeCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetTimeCommand())
+            responses = connection.async_trap_errors(await self._execute(Command()))
         else:
             return None
-        time = next(filter(GetTimeCommand.is_response, responses), None)
-        if time is not None:
-            self.__timeinfo = time["Time"]
-            self.__time = as_dateime(
-                time["Time"], tzinfo=get_tzinfo(time)
-            )
+
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
+
+        if result:
+            self.__timeinfo = result["Time"]
+            self.__time = as_dateime(result["Time"], tzinfo=get_tzinfo(result))
 
         return self.__time
 
     async def _ensure_time(self):
-        if self.__time is None:
-            return await self.get_time()
-        return self.__time
+        if self.__time:
+            return self.__time
+        return await self.get_time()
 
     async def get_time_info(self):
         """Get DST Info"""
-        await self.get_time()
+        await self._ensure_time()
         return self.__timeinfo
 
 
@@ -194,26 +253,41 @@ class GetAbilityResponseValue(TypedDict):
 class UserInfoRequestParameter:
     """User Info Request Parameter"""
 
-    User: UserInfo
+    User: User
 
 
-class AbilitiesCommand(CommandRequestWithParam[UserInfoRequestParameter]):
+class GetAbilitiesCommand(CommandRequestWithParam[UserInfoRequestParameter]):
     """Get Abilities"""
 
     COMMAND: Final = "GetAbility"
     RESPONSE: Final = "Ability"
 
-    def __init__(self, user: UserInfo | None = None, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
-        super().__init__(type(self).COMMAND, action,
-                         UserInfoRequestParameter(user or UserInfo("null")))
+    def __init__(
+        self,
+        user: User | None = None,
+        action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ) -> None:
+        super().__init__(
+            type(self).COMMAND,
+            action,
+            UserInfoRequestParameter(user or User("null")),
+        )
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetAbilityResponseValue]:  # pylint: disable=arguments-differ
+    def is_response(  # pylint: disable=arguments-differ
+        cls, value: any
+    ) -> TypeGuard[CommandResponseValue[GetAbilityResponseValue]]:
         """Is response a search result"""
-        return (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, GetAbilityResponseValue)
+        return cls._is_response(value, command=cls.COMMAND) and cls._is_typed_value(
+            value, cls.RESPONSE, GetAbilityResponseValue
         )
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetAbilityResponseValue]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
 
 
 class GetDeviceInfoResponseValueType(TypedDict):
@@ -228,16 +302,28 @@ class GetDeviceInfoCommand(CommandRequest):
     COMMAND: Final = "GetDevInfo"
     RESPONSE: Final = "DevInfo"
 
-    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
+    def __init__(
+        self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY
+    ) -> None:
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetDeviceInfoResponseValueType]:  # pylint: disable=arguments-differ
+    def is_response(  # pylint: disable=arguments-differ
+        cls, value: any
+    ) -> TypeGuard[CommandResponseValue[GetDeviceInfoResponseValueType]]:
         """Is response a search result"""
-        return (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, GetDeviceInfoResponseValueType)
+        return super().is_response(
+            value, command=cls.COMMAND
+        ) and super()._is_typed_value(
+            value, cls.RESPONSE, GetDeviceInfoResponseValueType
         )
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetDeviceInfoResponseValueType]):
+        """Get Response Value"""
+        return super().get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
 
 
 class GetTimeCommandResponseValueType(TypedDict, total=False):
@@ -253,15 +339,18 @@ class GetTimeCommand(CommandRequest):
     COMMAND: Final = "GetTime"
     RESPONSE: Final = "Time"
 
-    def __init__(self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
+    def __init__(
+        self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY
+    ) -> None:
         super().__init__(type(self).COMMAND, action)
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetTimeCommandResponseValueType]:  # pylint: disable=arguments-differ
+    def is_response(  # pylint: disable=arguments-differ
+        cls, value: any
+    ) -> TypeGuard[CommandResponseValue[GetTimeCommandResponseValueType]]:
         """Is response a search result"""
-        return (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, GetTimeCommandResponseValueType)
+        return cls._is_response(value, command=cls.COMMAND) and cls._is_typed_value(
+            value, cls.RESPONSE, GetTimeCommandResponseValueType
         )
 
 

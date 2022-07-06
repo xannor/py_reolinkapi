@@ -1,8 +1,12 @@
 """LED 3.10"""
 
 from dataclasses import dataclass
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 from typing_extensions import TypeGuard
+
+from .typing import ClockHour, ClockMinutes, IntPercent, OnOffState
+
+from .utils import afilter, alist, amap, anext
 
 try:
     from enum import StrEnum  # pylint: disable=ungrouped-imports
@@ -13,6 +17,7 @@ from .commands import (
     CommandChannelParameter,
     CommandRequestTypes,
     CommandRequestWithParam,
+    CommandResponseValue
 )
 from . import connection
 
@@ -23,6 +28,9 @@ class LightStates(StrEnum):
     AUTO = "Auto"
     ON = "On"
     OFF = "Off"
+
+
+LightStatesValues = Literal["Auto", "On", "Off"]
 
 
 @dataclass
@@ -36,38 +44,59 @@ class LightState:
 class LightStateType(TypedDict, total=False):
     """Light State"""
 
-    state: str
+    state: LightStatesValues
 
 
 @dataclass
 class LightingSchedule:
     """Lighting Schedule"""
 
-    StartHour: int
-    StartMin: int
-    EndHour: int
-    EndMin: int
+    StartHour: ClockHour
+    StartMin: ClockMinutes
+    EndHour: ClockHour
+    EndMin: ClockMinutes
+
+
+class LightingScheduleType(TypedDict):
+    """Lighting Schedule"""
+
+    StartHour: ClockHour
+    StartMin: ClockMinutes
+    EndHour: ClockHour
+    EndMinutes: ClockMinutes
 
 
 @dataclass
-class AiDetectType:
-    """AI Detect Types"""
+class AiDetect:
+    """ AI Detection Trigger"""
 
-    dog_cat: int
-    face: int
-    people: int
-    vehicle: int
+    dog_cat: OnOffState
+    face: OnOffState
+    people: OnOffState
+    vehicle: OnOffState
 
 
-@dataclass
-class WhiteLedInfo:
+class AiDetectType(TypedDict, total=False):
+    """AI Detection Trigger"""
+
+    dog_cat: OnOffState
+    face: OnOffState
+    people: OnOffState
+    vehicle: OnOffState
+
+
+class WhiteLedInfoType(TypedDict, total=False):
     """White Led Info"""
 
     channel: int
-    bright: int
+    bright: IntPercent
+    auto: int
+    """auto mode - according to API no example given"""
     mode: int
+    """brightness state - according to API 0 given as example"""
     state: int
-    LightingSchedule: LightingSchedule
+    """state - accoring to API 0 given as example"""
+    LightingSchedule: LightingScheduleType
     wlAiDetectType: AiDetectType
 
 
@@ -77,72 +106,123 @@ class LED:
     async def get_ir_lights(self, channel: int = 0):
         """Get IR Light State Info"""
 
+        Command = GetIrLightsRequest
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetIrLightsRequest(channel))
+            responses = connection.async_trap_errors(await self._execute(
+                Command(channel)
+            ))
         else:
             return None
 
-        value = next(filter(GetIrLightsRequest.is_response, responses), None)
-        if value is not None:
-            return value["IrLights"]["state"]
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
 
-    async def set_ir_lights(self, state: str, channel: int = 0):
+        if result:
+            return LightStates(result["state"])
+        return None
+
+    async def set_ir_lights(self, state: LightStates, channel: int = 0):
         """Set IR Light State"""
 
+        Command = SetIrLightsCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(
-                SetIrLightsCommand(channel, state)
-            )
+            responses = connection.async_trap_errors(await self._execute(
+                Command(state, channel)
+            ))
         else:
             return False
 
-        return 200 in map(SetIrLightsCommand.get_response_code, responses)
+        await alist(responses)  # eat all results looking for errors
+        return True
 
     async def get_power_led(self, channel: int = 0):
         """Get Power Led State Info"""
 
+        Command = GetPowerLedCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetPowerLedCommand(channel))
+            responses = connection.async_trap_errors(await self._execute(
+                Command(channel)
+            ))
         else:
             return None
 
-        value = next(filter(GetPowerLedCommand.is_response, responses), None)
-        if value is not None:
-            return value["PowerLed"]["state"]
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
 
-    async def set_power_led(self, state: str, channel: int):
+        if result:
+            return LightStates(result["state"])
+        return None
+
+    async def set_power_led(self, state: LightStates, channel: int):
         """Set Power Led State"""
 
+        Command = SetPowerLedCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(
-                SetPowerLedCommand(channel, state)
-            )
+            responses = connection.async_trap_errors(await self._execute(
+                Command(state, channel)
+            ))
         else:
             return False
 
-        return 200 in map(SetPowerLedCommand.get_response_code, responses)
+        await alist(responses)  # eat all results looking for errors
+        return True
 
     async def get_white_led(self, channel: int = 0):
         """Get White Led State Info"""
 
+        Command = GetWhiteLedCommand
+
         if isinstance(self, connection.Connection):
-            responses = await self._execute(GetWhiteLedCommand(channel))
+            responses = connection.async_trap_errors(await self._execute(
+                Command(channel)
+            ))
         else:
             return None
 
-        value = next(filter(GetWhiteLedCommand.is_response, responses), None)
-        if value is not None:
-            return value["WhiteLed"]
+        result = await anext(
+            amap(
+                Command.get_value,
+                afilter(
+                    Command.is_response,
+                    responses
+                )
+            ),
+            None,
+        )
+
+        if result:
+            return LightStates(result["state"])
+        return None
 
     async def set_white_led(
         self,
-        state: str,
+        state: int,
         channel: int,
         *,
-        bright: int = None,
+        bright: IntPercent = None,
         mode: int = None,
         schedule: LightingSchedule = None,
-        ai: AiDetectType = None
+        ai: AiDetect = None
     ):
         """Set White Led State"""
 
@@ -174,12 +254,19 @@ class GetIrLightsRequest(CommandRequestWithParam[CommandChannelParameter]):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetIrLightsResponseValueType]:  # pylint: disable=arguments-differ
-        """Is response a search result"""
+    def is_response(cls, value: any) -> TypeGuard[CommandResponseValue[GetIrLightsResponseValueType]]:  # pylint: disable=arguments-differ
+        """Is response"""
         return (
             super().is_response(value, command=cls.COMMAND)
             and super()._is_typed_value(value, cls.RESPONSE, GetIrLightsResponseValueType)
         )
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetIrLightsResponseValueType]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
 
 
 @dataclass
@@ -209,18 +296,25 @@ class GetPowerLedCommand(CommandRequestWithParam[CommandChannelParameter]):
     """Get Power Led"""
 
     COMMAND: Final = "GetPowerLed"
-    RESPONSE: Final = "channel"
+    RESPONSE: Final = "PowerLed"
 
     def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetPowerLedResponseValueType]:  # pylint: disable=arguments-differ
-        """Is response a search result"""
+    def is_response(cls, value: any) -> TypeGuard[CommandResponseValue[GetPowerLedResponseValueType]]:  # pylint: disable=arguments-differ
+        """Is response"""
         return (
             super().is_response(value, command=cls.COMMAND)
             and super()._is_typed_value(value, cls.RESPONSE, GetPowerLedResponseValueType)
         )
+
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetPowerLedResponseValueType]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
 
 
 class SetPowerLedParameter:
@@ -242,32 +336,39 @@ class SetPowerLedCommand(CommandRequestWithParam[SetPowerLedParameter]):
 class GetWhiteLedResponseValueType(TypedDict, total=False):
     """Get White Led Response Value"""
 
-    WhiteLed: WhiteLedInfo
+    WhiteLed: WhiteLedInfoType
 
 
 class GetWhiteLedCommand(CommandRequestWithParam[CommandChannelParameter]):
     """Get Power Led"""
 
     COMMAND: Final = "GetWhiteLed"
-    RESPONSE: Final = "channel"
+    RESPONSE: Final = "WhiteLed"
 
     def __init__(self, channel: int = 0, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(cls, value: any) -> TypeGuard[GetWhiteLedResponseValueType]:  # pylint: disable=arguments-differ
+    def is_response(cls, value: any) -> TypeGuard[CommandResponseValue[GetWhiteLedResponseValueType]]:  # pylint: disable=arguments-differ
         """Is response a search result"""
         return (
             super().is_response(value, command=cls.COMMAND)
             and super()._is_typed_value(value, cls.RESPONSE, GetWhiteLedResponseValueType)
         )
 
+    @classmethod
+    def get_value(cls, value: CommandResponseValue[GetWhiteLedResponseValueType]):
+        """Get Response Value"""
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
+
 
 @dataclass
 class SetWhiteLedParameter:
     """Set White Led State"""
 
-    WhiteLed: WhiteLedInfo
+    WhiteLed: WhiteLedInfoType
 
 
 class SetWhiteLedCommand(CommandRequestWithParam[SetWhiteLedParameter]):
@@ -285,7 +386,7 @@ class SetWhiteLedCommand(CommandRequestWithParam[SetWhiteLedParameter]):
         schedule: LightingSchedule = None,
         ai: AiDetectType = None
     ):
-        super().__init__(type(self).COMMAND, action, SetWhiteLedParameter(WhiteLedInfo(
+        super().__init__(type(self).COMMAND, action, SetWhiteLedParameter(WhiteLedInfoType(
             channel=channel,
             state=state,
             bright=bright,

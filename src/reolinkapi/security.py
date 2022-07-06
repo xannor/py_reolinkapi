@@ -4,29 +4,30 @@ from abc import ABC
 from dataclasses import dataclass
 import inspect
 from time import time
-from typing import Callable, Final, Iterable, TypedDict
+from typing import Callable, Final, AsyncIterable, TypedDict
 from typing_extensions import TypeGuard
 
-from .system import UserInfo
+from .system import User
 
 from .const import DEFAULT_PASSWORD, DEFAULT_USERNAME
+
+from .utils import anext
 
 from .commands import (
     CommandRequestTypes,
     CommandRequest,
     CommandRequestWithParam,
     CommandResponseType,
+    CommandResponseValue,
 )
 
 from .errors import ErrorCodes
 
 from . import connection
 
-LOGOUT_CALLBACK_TYPE = Callable[[], None]
-
 
 @dataclass
-class LoginInfo(UserInfo):
+class Login(User):
     """Login info"""
 
     password: str
@@ -64,33 +65,19 @@ class Security(ABC):
     """Abstract Security Mixin"""
 
     def __init__(self) -> None:
-        self._logout_callbacks: list[LOGOUT_CALLBACK_TYPE] = []
+        self._logout_callbacks: list[Callable[[], None]] = []
         self.__token = ""
         super().__init__()
         if isinstance(self, connection.Connection):
             self._disconnect_callbacks.append(self.logout)
         self.__last_pwd_hash = 0
         self.__token_expires: float = 0
-        self.__auth_failed = False
 
     @property
-    def authenticated(self):
+    def is_authenticated(self):
         """authentication status"""
         # we use a 1s offest to give time for simple checks to do an operation
-        return not self.__auth_failed and self.authentication_timeout > 1
-
-    @property
-    def authentication_required(self):
-        """Authentication is missing or invalid"""
-        return self.__auth_failed
-
-    @property
-    def _auth_failed(self):
-        return self.__auth_failed
-
-    @_auth_failed.setter
-    def _auth_failed(self, value: bool):
-        self.__auth_failed = value
+        return bool(self.__token) and self.authentication_timeout > 1
 
     @property
     def _auth_token(self):
@@ -114,61 +101,65 @@ class Security(ABC):
             self.__last_pwd_hash = pwd_hash
 
         if isinstance(self, connection.Connection):
-            if not self._ensure_connection():
+            if not self.is_connected:
                 return False
         return True
 
-    async def _do_login(self, username: str, password: str):
-        if isinstance(self, connection.Connection):
-            return await self._execute(LoginCommand(LoginInfo(username, password)))
-        return []
+    async def _process_token(self, responses: AsyncIterable[CommandResponseType]):
+        async for response in responses:
+            if not LoginCommand.is_response:
+                continue
+            token = LoginCommand.get_value(response)
 
-    def _process_token(self, responses: Iterable[CommandResponseType]):
-        token = next(map(LoginCommand.get_response, filter(
-            LoginCommand.is_response, responses)), None)
-        self.__auth_failed = True
-        if token is None:
-            return False
-        self.__auth_failed = False
+            self.__token = token["name"]
+            self.__token_expires = time() + token["leaseTime"]
 
-        self.__token = token["name"]
-        self.__token_expires = time() + token["leaseTime"]
+            return True
 
-        return True
+        return False
 
     async def login(
         self, username: str = DEFAULT_USERNAME, password: str = DEFAULT_PASSWORD
     ) -> bool:
         """attempt to log into device"""
 
-        if not self._prelogin(username):
+        if not isinstance(self, connection.Connection):
             return False
 
-        return self._process_token(await self._do_login(username, password))
+        if not await self._prelogin(username):
+            return False
+
+        responses = connection.async_trap_errors(await self._execute(LoginCommand(  # pylint: disable=no-member
+            Login(username, password))))
+
+        return await self._process_token(responses)
 
     async def logout(self) -> None:
         """Clear authentication information"""
 
-        if self.authenticated:
-            if isinstance(self, connection.Connection):
-                if self._ensure_connection():
-                    errors = list(
-                        filter(
-                            LogoutCommand.is_error,
-                            await self._execute(LogoutCommand()),
-                        )
-                    )
-                    if len(errors) > 0:
-                        raise errors[0]
+        if not self.is_authenticated:
+            return
 
-        for callback in self._logout_callbacks:
-            if inspect.iscoroutinefunction(callback):
-                await callback()
-            else:
-                callback()
-        self.__auth_failed = False
-        self.__token = ""
-        self.__token_expires = 0
+        if not isinstance(self, connection.Connection):
+            return
+
+        if not self.is_connected:  # pylint: disable=no-member
+            return
+
+        responses = connection.async_trap_errors(await self._execute(  # pylint: disable=no-member
+            LogoutCommand()))
+
+        try:
+            await anext(responses)
+
+            for callback in self._logout_callbacks:
+                if inspect.iscoroutinefunction(callback):
+                    await callback()
+                else:
+                    callback()
+        finally:
+            self.__token = ""
+            self.__token_expires = 0
 
 
 class LoginResponseValueType(TypedDict):
@@ -177,11 +168,11 @@ class LoginResponseValueType(TypedDict):
     Token: LoginTokenType
 
 
-@dataclass
+@ dataclass
 class LoginRequestParameter:
     """Login Request Parameter"""
 
-    User: LoginInfo
+    User: Login
 
 
 class LoginCommand(CommandRequestWithParam[LoginRequestParameter]):
@@ -190,25 +181,36 @@ class LoginCommand(CommandRequestWithParam[LoginRequestParameter]):
     COMMAND: Final = "Login"
     RESPONSE: Final = "Token"
 
-    def __init__(self, login: LoginInfo, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY) -> None:
+    def __init__(
+        self,
+        login: Login,
+        action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY,
+    ) -> None:
         super().__init__(type(self).COMMAND, action, LoginRequestParameter(login))
 
-    @classmethod
-    def is_response(cls, value: any) -> TypeGuard[LoginResponseValueType]:  # pylint: disable=arguments-differ
+    @ classmethod
+    def is_response(  # pylint: disable=arguments-differ
+        cls, value: any
+    ) -> TypeGuard[CommandResponseValue[LoginResponseValueType]]:
         """Is response a search result"""
-        return (
-            super().is_response(value, command=cls.COMMAND)
-            and super()._is_typed_value(value, cls.RESPONSE, LoginResponseValueType)
+        return cls._is_response(value, command=cls.COMMAND) and cls._is_typed_value(
+            value, cls.RESPONSE, LoginResponseValueType
         )
 
-    @classmethod
-    def get_response(cls, value: LoginResponseValueType):
+    @ classmethod
+    def get_value(cls, value: CommandResponseValue[LoginResponseValueType]):
         """Get Channel Status Response"""
-        return value[cls.RESPONSE]
+        return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
+            cls.RESPONSE
+        ]
 
-    @classmethod
+    @ classmethod
     def is_auth_failure(cls, value: CommandResponseType):
-        return super()._is_response_code(value) and super()._get_response_code(value) == ErrorCodes.AUTH_REQUIRED
+        """is authentication failure response"""
+        return (
+            cls._is_response_code(value)
+            and cls._get_response_code(value) == ErrorCodes.AUTH_REQUIRED
+        )
 
 
 class LogoutCommand(CommandRequest):
