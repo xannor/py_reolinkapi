@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 from enum import IntEnum
-from typing import Callable, NewType, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, NewType
 
-# pylint: disable=unused-import
-from backports.strenum import StrEnum
+if TYPE_CHECKING:  # typechecker is having issues with the backport
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """String Enum"""
+
+        # pylint: disable=no-self-argument
+        def _generate_next_value_(name, *_):
+            return name.lower()
+
+else:
+    try:
+        from enum import StrEnum
+    except ImportError:
+        from backports.strenum import StrEnum
 
 
 class OnOffState(IntEnum):
@@ -40,16 +53,3 @@ ClockMinutes = NewType("ClockMinutes", int)
 
 ClockSeconds = NewType("ClockSeconds", int)
 """ An integer representing a 60 second cycle """
-
-
-@runtime_checkable
-class SupportsAsyncRead(Protocol):
-    """async read support"""
-
-    async def read(self, n: int = -1) -> bytes:
-        """read n(or all if -1) bytes"""
-
-
-@runtime_checkable
-class StreamReader(SupportsAsyncRead, Protocol):
-    """async StreamReader"""

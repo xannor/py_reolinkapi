@@ -1,7 +1,7 @@
 """Network 3.3"""
 from __future__ import annotations
 
-from typing import Final, TypedDict
+from typing import TYPE_CHECKING, Final, TypedDict, cast
 from typing_extensions import TypeGuard
 
 from .utils import afilter, amap, anext
@@ -15,11 +15,12 @@ from .commands import (
     CommandRequest,
     CommandRequestTypes,
     CommandResponseValue,
+    async_trap_errors,
 )
 
 from .const import IntStreamTypes
 
-from . import connection, system
+from . import connection, system, security
 
 
 class LinkType(StrEnum):
@@ -113,18 +114,12 @@ class Network:
         Command = GetLocalLinkCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(Command()))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 
@@ -137,18 +132,12 @@ class Network:
         Command = GetChannelStatusCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(Command()))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return []
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 
@@ -161,18 +150,12 @@ class Network:
         Command = GetNetworkPortsCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(Command()))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 
@@ -195,7 +178,7 @@ class Network:
         if not commands:
             return
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(*commands))
+            responses = async_trap_errors(self._execute(*commands))
         else:
             return
 
@@ -217,29 +200,25 @@ class Network:
                     self.__no_get_rtsp = True
 
         if not self.__no_get_rtsp:
+
             def _ignore_errors(*_):
                 return True
 
             Command = GetRTSPUrlsCommand
 
             if isinstance(self, connection.Connection):
-                responses = connection.async_trap_errors(await self._execute(
-                    Command(), _ignore_errors
-                ))
+                responses = async_trap_errors(self._execute(Command(), _ignore_errors))
 
                 result = await anext(
-                    amap(
-                        Command.get_value,
-                        afilter(
-                            Command.is_response,
-                            responses
-                        )
-                    ),
+                    amap(Command.get_value, afilter(Command.is_response, responses)),
                     None,
                 )
 
                 if result:
-                    return result[f"{stream.name.lower()}Stream"]
+                    url = result[f"{stream.name.lower()}Stream"]
+                    if TYPE_CHECKING:
+                        url = cast(str, url)
+                    return url
 
             self.__no_get_rtsp = True
 
@@ -252,8 +231,6 @@ class Network:
         )
 
         url = f'rtsp://{self.__link["static"]["ip"]}{port}/h264Preview_{(channel+1):02}_{stream.name.lower()}'
-        # if isinstance(self, security.Security) and self._auth_token != "":
-        #    return f"{url}&token={self._auth_token}"
         return url
 
     async def get_rtmp_url(
@@ -270,10 +247,9 @@ class Network:
         )
 
         url = f'rtmp://{self.__link["static"]["ip"]}{port}/bcs/channel{channel}_{stream.name.lower()}.bcs?channel={channel}&stream={stream}'
-        # TODO: verify rtmp supports token url
-        # if isinstance(self, security.Security):
-        #    if self._auth_token != "":
-        #        return f"{url}&token={self._auth_token}"
+        if isinstance(self, security.Security):
+            if self._auth_token != "":
+                return f"{url}&token={self._auth_token}"
         return url
 
     async def get_p2p(self):
@@ -282,20 +258,12 @@ class Network:
         Command = GetP2PCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
-                Command()
-            ))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 

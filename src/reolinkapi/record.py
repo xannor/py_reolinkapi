@@ -10,8 +10,6 @@ from typing_extensions import TypeGuard
 
 from .errors import ReolinkStreamResponseError
 
-from .typing import StreamReader
-
 from .utils import anext, afilter, amap, alist
 
 
@@ -20,7 +18,8 @@ from .commands import (
     CommandRequestTypes,
     CommandRequestWithParam,
     CommandResponseType,
-    CommandResponseValue
+    CommandResponseValue,
+    async_trap_errors,
 )
 from . import connection
 from . import system
@@ -124,18 +123,22 @@ class Record:
         if not isinstance(self, connection.Connection):
             return None
 
-        response = await self._execute(  # pylint: disable=no-member
+        responses = self._execute(  # pylint: disable=no-member
             SnapshotCommand(channel),
         )
 
-        if response is None:
+        if responses is None:
             return None
 
-        if not isinstance(response, StreamReader):
-            await alist(connection.async_trap_errors(response))
-            raise ReolinkStreamResponseError()
+        buffer = bytearray()
 
-        return await response.read()
+        async for response in responses:
+            if not isinstance(response, (bytes, bytearray)):
+                await alist(async_trap_errors(response))
+                raise ReolinkStreamResponseError()
+            buffer += bytearray(response)
+
+        return bytes(buffer)
 
     async def _search(
         self,
@@ -176,7 +179,7 @@ class Record:
         if not isinstance(self, connection.Connection):
             return None
 
-        responses = connection.async_trap_errors(await self._execute(  # pylint: disable=no-member
+        responses = async_trap_errors(self._execute(  # pylint: disable=no-member
             SearchCommand(search)
         ))
 

@@ -5,7 +5,7 @@ from typing_extensions import TypeGuard
 
 from .utils import afilter, amap, anext
 
-from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponseValue
+from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponseValue, async_trap_errors
 from . import connection
 
 from .typing import OnOffState
@@ -43,7 +43,7 @@ class Encoding:
         Command = GetEncodingCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(channel)
             ))
         else:

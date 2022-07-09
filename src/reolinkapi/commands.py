@@ -5,8 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import (
+    AsyncIterable,
+    Callable,
     Final,
     Generic,
+    Iterable,
+    Optional,
+    Protocol,
     Type,
     TypeVar,
     TypedDict,
@@ -15,6 +20,8 @@ from typing import (
     overload,
 )
 from typing_extensions import NotRequired, TypeGuard
+
+from .errors import ErrorCodes, ReolinkResponseError
 
 
 _T = TypeVar("_T")
@@ -224,3 +231,50 @@ class CommandResponseErrorValueType(CommandResponseType):
 
 
 COMMAND_RESPONSE_ERROR: Final = "error"
+
+
+class TrapCallback(Protocol):
+    """Error Trap"""
+
+    def __call__(self, code: ErrorCodes, details: str |
+                 None = None) -> any: ...
+
+
+def _raise_response_error(code: ErrorCodes, details: str | None = None) -> bool:
+    raise ReolinkResponseError(code=code, details=details)
+
+
+def trap_errors(responses: Iterable[CommandResponseType | bytes], *, __trap: TrapCallback | None = None):
+    """Trap response errors"""
+    for response in responses:
+        if isinstance(response, (bytearray, bytes)):
+            code = ErrorCodes.PROTOCOL_ERROR
+            details = "Expected CommandResponses got bytes"
+            if not (__trap or __trap(code, details)):
+                _raise_response_error(code, details)
+            continue
+        if CommandRequest.is_error(response):
+            error = response["error"]
+            code = ErrorCodes(error["rspCode"])
+            if not __trap(code, error["detail"]):
+                _raise_response_error(code, error["detail"])
+            continue
+        yield response
+
+
+async def async_trap_errors(responses: AsyncIterable[CommandResponseType | bytes], *, __trap: TrapCallback | None = None):
+    """async treap response errors"""
+    async for response in responses:
+        if isinstance(response, (bytearray, bytes)):
+            code = ErrorCodes.PROTOCOL_ERROR
+            details = "Expected CommandResponses got bytes"
+            if not (__trap or __trap(code, details)):
+                _raise_response_error(code, details)
+            continue
+        if CommandRequest.is_error(response):
+            error = response["error"]
+            code = ErrorCodes(error["rspCode"])
+            if not __trap(code, error["detail"]):
+                _raise_response_error(code, error["detail"])
+            continue
+        yield response

@@ -17,7 +17,8 @@ from .commands import (
     CommandChannelParameter,
     CommandRequestTypes,
     CommandRequestWithParam,
-    CommandResponseValue
+    CommandResponseValue,
+    async_trap_errors,
 )
 from . import connection
 
@@ -109,7 +110,7 @@ class LED:
         Command = GetIrLightsRequest
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(channel)
             ))
         else:
@@ -136,7 +137,7 @@ class LED:
         Command = SetIrLightsCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(state, channel)
             ))
         else:
@@ -151,7 +152,7 @@ class LED:
         Command = GetPowerLedCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(channel)
             ))
         else:
@@ -178,7 +179,7 @@ class LED:
         Command = SetPowerLedCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(state, channel)
             ))
         else:
@@ -193,7 +194,7 @@ class LED:
         Command = GetWhiteLedCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(channel)
             ))
         else:

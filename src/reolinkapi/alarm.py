@@ -13,6 +13,7 @@ from .commands import (
     CommandRequestTypes,
     CommandRequestWithParam,
     CommandResponseValue,
+    async_trap_errors,
 )
 from . import connection
 
@@ -26,7 +27,7 @@ class Alarm:
         Command = GetMotionStateCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
+            responses = async_trap_errors(self._execute(
                 Command(channel)
             ))
         else:

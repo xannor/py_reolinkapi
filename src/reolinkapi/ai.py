@@ -16,6 +16,7 @@ from .commands import (
     CommandRequestWithParam,
     CommandResponseValue,
     CommandResponseChannelValueType,
+    async_trap_errors,
 )
 from . import connection
 
@@ -24,7 +25,7 @@ GetAiStateResponseValueType = NewType(
     "GetAiStateResponseValueType", CommandResponseChannelValueType
 )
 
-
+# pylint: disable=invalid-enum-extension
 class AITypes(StrEnum):
     """AI Types"""
 
@@ -35,7 +36,9 @@ class AITypes(StrEnum):
     VEHICLE = auto()
 
     @staticmethod
-    def is_ai_response_values(_response: GetAiConfigResponseValueType) -> TypeGuard[Mapping[AITypes, AiAlarmStateType]]:
+    def is_ai_response_values(
+        _response: GetAiConfigResponseValueType,
+    ) -> TypeGuard[Mapping[AITypes, AiAlarmStateType]]:
         """cast to mapping"""
         return True
 
@@ -56,20 +59,12 @@ class AI:
         Command = GetAiStateCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
-                Command(channel)
-            ))
+            responses = async_trap_errors(self._execute(Command(channel)))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
         if AITypes.is_ai_response_values(result):
@@ -82,17 +77,12 @@ class AI:
         Command = GetAiConfigCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
-                Command(channel)
-            ))
+            responses = async_trap_errors(self._execute(Command(channel)))
         else:
             return None
 
         result = await anext(
-            afilter(
-                Command.is_response,
-                responses
-            ),
+            afilter(Command.is_response, responses),
             None,
         )
         return result

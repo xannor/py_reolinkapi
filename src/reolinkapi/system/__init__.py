@@ -14,6 +14,7 @@ from ..commands import (
     CommandRequest,
     CommandRequestWithParam,
     CommandResponseValue,
+    async_trap_errors,
 )
 
 from .abilities import Abilities
@@ -130,7 +131,8 @@ class TimeValueInfo(TimeValueType):
 class System:
     """System Commands Mixin"""
 
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.__timeinfo: TimeValueInfo | None = None
         self.__time: datetime.datetime | None = None
         self.__abilities: Abilities | None = None
@@ -151,18 +153,12 @@ class System:
 
         Command = GetAbilitiesCommand
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(
-                Command(User(username) if username else None)
-            ))
+            responses = async_trap_errors(
+                self._execute(Command(User(username) if username else None))
+            )
 
             result = await anext(
-                amap(
-                    Command.get_value,
-                    afilter(
-                        Command.is_response,
-                        responses
-                    )
-                ),
+                amap(Command.get_value, afilter(Command.is_response, responses)),
                 None,
             )
 
@@ -185,18 +181,12 @@ class System:
         Command = GetDeviceInfoCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(Command()))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 
@@ -211,18 +201,12 @@ class System:
         Command = GetTimeCommand
 
         if isinstance(self, connection.Connection):
-            responses = connection.async_trap_errors(await self._execute(Command()))
+            responses = async_trap_errors(self._execute(Command()))
         else:
             return None
 
         result = await anext(
-            amap(
-                Command.get_value,
-                afilter(
-                    Command.is_response,
-                    responses
-                )
-            ),
+            amap(Command.get_value, afilter(Command.is_response, responses)),
             None,
         )
 
@@ -413,8 +397,7 @@ class _timezone(datetime.tzinfo):
     def get_or_create(cls, dst_info: DaylightSavingsTimeInfo, time_info: TimeValueInfo):
         """Get existing or create new"""
         return cls._cache.setdefault(
-            (dst_info["enable"], time_info["timeZone"]
-             ), _timezone(dst_info, time_info)
+            (dst_info["enable"], time_info["timeZone"]), _timezone(dst_info, time_info)
         )
 
     def tzname(self, __dt: datetime.datetime | None):

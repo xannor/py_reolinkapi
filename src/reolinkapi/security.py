@@ -19,6 +19,7 @@ from .commands import (
     CommandRequestWithParam,
     CommandResponseType,
     CommandResponseValue,
+    async_trap_errors
 )
 
 from .errors import ErrorCodes
@@ -64,10 +65,10 @@ class DigestInfo(TypedDict):
 class Security(ABC):
     """Abstract Security Mixin"""
 
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         self._logout_callbacks: list[Callable[[], None]] = []
         self.__token = ""
-        super().__init__()
+        super().__init__(*args, **kwargs)
         if isinstance(self, connection.Connection):
             self._disconnect_callbacks.append(self.logout)
         self.__last_pwd_hash = 0
@@ -129,8 +130,11 @@ class Security(ABC):
         if not await self._prelogin(username):
             return False
 
-        responses = connection.async_trap_errors(await self._execute(LoginCommand(  # pylint: disable=no-member
-            Login(username, password))))
+        responses = async_trap_errors(
+            self._execute(  # pylint: disable=no-member
+                LoginCommand(Login(username, password))
+            )
+        )
 
         return await self._process_token(responses)
 
@@ -146,8 +150,9 @@ class Security(ABC):
         if not self.is_connected:  # pylint: disable=no-member
             return
 
-        responses = connection.async_trap_errors(await self._execute(  # pylint: disable=no-member
-            LogoutCommand()))
+        responses = async_trap_errors(
+            self._execute(LogoutCommand())  # pylint: disable=no-member
+        )
 
         try:
             await anext(responses)
@@ -168,7 +173,7 @@ class LoginResponseValueType(TypedDict):
     Token: LoginTokenType
 
 
-@ dataclass
+@dataclass
 class LoginRequestParameter:
     """Login Request Parameter"""
 
@@ -188,7 +193,7 @@ class LoginCommand(CommandRequestWithParam[LoginRequestParameter]):
     ) -> None:
         super().__init__(type(self).COMMAND, action, LoginRequestParameter(login))
 
-    @ classmethod
+    @classmethod
     def is_response(  # pylint: disable=arguments-differ
         cls, value: any
     ) -> TypeGuard[CommandResponseValue[LoginResponseValueType]]:
@@ -197,14 +202,14 @@ class LoginCommand(CommandRequestWithParam[LoginRequestParameter]):
             value, cls.RESPONSE, LoginResponseValueType
         )
 
-    @ classmethod
+    @classmethod
     def get_value(cls, value: CommandResponseValue[LoginResponseValueType]):
         """Get Channel Status Response"""
         return cls._get_value(value)[  # pylint: disable=unsubscriptable-object
             cls.RESPONSE
         ]
 
-    @ classmethod
+    @classmethod
     def is_auth_failure(cls, value: CommandResponseType):
         """is authentication failure response"""
         return (
