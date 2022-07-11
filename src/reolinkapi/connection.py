@@ -14,6 +14,8 @@ from .commands import (
     async_trap_errors,
 )
 
+from .errors import ErrorCodes
+
 
 class Connection(ABC):
     """Abstract Connection Mixin"""
@@ -74,4 +76,4 @@ class Connection(ABC):
     ):
         """Execute a batch of commands"""
 
-        return async_trap_errors(self._execute(*commands))
+        return async_trap_errors(self._execute(*commands), __trap=__trap)

@@ -236,15 +236,19 @@ COMMAND_RESPONSE_ERROR: Final = "error"
 class TrapCallback(Protocol):
     """Error Trap"""
 
-    def __call__(self, code: ErrorCodes, details: str |
-                 None = None) -> any: ...
+    def __call__(self, code: ErrorCodes, details: str | None = None) -> any:
+        ...
 
 
 def _raise_response_error(code: ErrorCodes, details: str | None = None) -> bool:
     raise ReolinkResponseError(code=code, details=details)
 
 
-def trap_errors(responses: Iterable[CommandResponseType | bytes], *, __trap: TrapCallback | None = None):
+def trap_errors(
+    responses: Iterable[CommandResponseType | bytes],
+    *,
+    __trap: TrapCallback | None = None,
+):
     """Trap response errors"""
     for response in responses:
         if isinstance(response, (bytearray, bytes)):
@@ -262,19 +266,31 @@ def trap_errors(responses: Iterable[CommandResponseType | bytes], *, __trap: Tra
         yield response
 
 
-async def async_trap_errors(responses: AsyncIterable[CommandResponseType | bytes], *, __trap: TrapCallback | None = None):
+async def async_trap_errors(
+    responses: AsyncIterable[CommandResponseType | bytes],
+    *,
+    __trap: TrapCallback | None = None,
+):
     """async treap response errors"""
     async for response in responses:
         if isinstance(response, (bytearray, bytes)):
             code = ErrorCodes.PROTOCOL_ERROR
             details = "Expected CommandResponses got bytes"
-            if not (__trap or __trap(code, details)):
+            if __trap:
+                _r = not __trap(code, details)
+            else:
+                _r = True
+            if _r:
                 _raise_response_error(code, details)
-            continue
+            break
         if CommandRequest.is_error(response):
             error = response["error"]
             code = ErrorCodes(error["rspCode"])
-            if not __trap(code, error["detail"]):
+            if __trap:
+                _r = not __trap(code, error["detail"])
+            else:
+                _r = True
+            if _r:
                 _raise_response_error(code, error["detail"])
             continue
         yield response
