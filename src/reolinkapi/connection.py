@@ -14,8 +14,6 @@ from .commands import (
     async_trap_errors,
 )
 
-from .errors import ErrorCodes
-
 
 class Connection(ABC):
     """Abstract Connection Mixin"""
