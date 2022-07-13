@@ -11,8 +11,6 @@ from .system import User
 
 from .const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 
-from .utils import anext
-
 from .commands import (
     CommandRequestTypes,
     CommandRequest,

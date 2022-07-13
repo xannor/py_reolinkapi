@@ -3,9 +3,15 @@
 from typing import Final, TypedDict
 from typing_extensions import TypeGuard
 
-from .utils import afilter, amap, anext
+from .utils import afilter, amap
 
-from .commands import CommandChannelParameter, CommandRequestTypes, CommandRequestWithParam, CommandResponseValue, async_trap_errors
+from .commands import (
+    CommandChannelParameter,
+    CommandRequestTypes,
+    CommandRequestWithParam,
+    CommandResponseValue,
+    async_trap_errors,
+)
 from . import connection
 
 from .typing import OnOffState

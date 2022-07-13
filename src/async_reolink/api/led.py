@@ -4,14 +4,11 @@ from dataclasses import dataclass
 from typing import Final, Literal, TypedDict
 from typing_extensions import TypeGuard
 
+from backports.strenum import StrEnum
+
 from .typing import ClockHour, ClockMinutes, IntPercent, OnOffState
 
-from .utils import afilter, alist, amap, anext
-
-try:
-    from enum import StrEnum  # pylint: disable=ungrouped-imports
-except ImportError:
-    from backports.strenum import StrEnum
+from .utils import afilter, alist, amap
 
 from .commands import (
     CommandChannelParameter,

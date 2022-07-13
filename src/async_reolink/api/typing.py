@@ -14,12 +14,6 @@ if TYPE_CHECKING:  # typechecker is having issues with the backport
         def _generate_next_value_(name, *_):
             return name.lower()
 
-else:
-    try:
-        from enum import StrEnum
-    except ImportError:
-        from backports.strenum import StrEnum
-
 
 class OnOffState(IntEnum):
     """On/Off State"""

@@ -3,7 +3,7 @@
 from typing import Final, TypedDict
 from typing_extensions import TypeGuard
 
-from .utils import afilter, amap, anext
+from .utils import afilter, amap
 
 
 from .typing import OnOffState

@@ -4,12 +4,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, TypedDict, cast
 from typing_extensions import TypeGuard
 
-from .utils import afilter, amap, anext
+from backports.strenum import StrEnum
 
-try:
-    from enum import StrEnum  # pylint: disable=ungrouped-imports
-except ImportError:
-    from backports.strenum import StrEnum
+from .utils import afilter, amap
 
 from .commands import (
     CommandRequest,
@@ -207,10 +204,12 @@ class Network:
             Command = GetRTSPUrlsCommand
 
             if isinstance(self, connection.Connection):
-                responses = async_trap_errors(self._execute(Command(), _ignore_errors))
+                responses = async_trap_errors(
+                    self._execute(Command(), _ignore_errors))
 
                 result = await anext(
-                    amap(Command.get_value, afilter(Command.is_response, responses)),
+                    amap(Command.get_value, afilter(
+                        Command.is_response, responses)),
                     None,
                 )
 

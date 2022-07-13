@@ -10,7 +10,7 @@ from typing_extensions import TypeGuard
 
 from .errors import ReolinkStreamResponseError
 
-from .utils import anext, afilter, amap, alist
+from .utils import afilter, amap, alist
 
 
 from .commands import (

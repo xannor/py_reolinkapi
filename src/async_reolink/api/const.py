@@ -1,18 +1,14 @@
 """ Constants """
 
 from enum import IntEnum
-from typing import Literal
+from typing import Final, Literal
+from backports.strenum import StrEnum
 
-try:
-    from enum import StrEnum #pylint: disable=ungrouped-imports
-except ImportError:
-    from backports.strenum import StrEnum
+DEFAULT_TIMEOUT: Final = 30
+DEFAULT_USERNAME: Final = "admin"
+DEFAULT_PASSWORD: Final = ""
 
-DEFAULT_TIMEOUT = 30
-DEFAULT_USERNAME = "admin"
-DEFAULT_PASSWORD = ""
-
-STREAM_TYPES = Literal["main", "sub", "ext"]
+STREAM_TYPES: Final = Literal["main", "sub", "ext"]
 
 
 class IntStreamTypes(IntEnum):
@@ -22,12 +18,14 @@ class IntStreamTypes(IntEnum):
     SUB = 1
     EXT = 2
 
+
 class StreamTypes(StrEnum):
     """Stream Types"""
 
     MAIN = "main"
     SUB = "sub"
     EXT = "ext"
+
 
 class LightTypes(IntEnum):
     """Light Types"""

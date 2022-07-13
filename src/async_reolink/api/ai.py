@@ -8,7 +8,7 @@ from typing_extensions import TypeGuard
 
 from .typing import BoolState, OnOffState, StrEnum
 
-from .utils import afilter, amap, anext
+from .utils import afilter, amap
 
 from .commands import (
     CommandChannelParameter,
@@ -25,7 +25,7 @@ GetAiStateResponseValueType = NewType(
     "GetAiStateResponseValueType", CommandResponseChannelValueType
 )
 
-# pylint: disable=invalid-enum-extension
+
 class AITypes(StrEnum):
     """AI Types"""
 
@@ -102,11 +102,11 @@ class GetAiStateCommand(CommandRequestWithParam[CommandChannelParameter]):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(
+    def is_response(  # pylint: disable=arguments-differ
         cls, value: any
     ) -> TypeGuard[
         CommandResponseValue[GetAiStateResponseValueType]
-    ]:  # pylint: disable=arguments-differ
+    ]:
         """Is response a search result"""
         return super().is_response(
             value, command=cls.COMMAND
@@ -135,9 +135,9 @@ class GetAiConfigCommand(CommandRequestWithParam[CommandChannelParameter]):
         super().__init__(type(self).COMMAND, action, CommandChannelParameter(channel))
 
     @classmethod
-    def is_response(
+    def is_response(  # pylint: disable=arguments-differ
         cls, value: any
-    ) -> TypeGuard[GetAiConfigResponseValueType]:  # pylint: disable=arguments-differ
+    ) -> TypeGuard[GetAiConfigResponseValueType]:
         """Is response a search result"""
         return super().is_response(
             value, command=cls.COMMAND

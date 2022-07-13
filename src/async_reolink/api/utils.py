@@ -2,40 +2,10 @@
 
 from __future__ import annotations
 
-from typing import AsyncGenerator, AsyncIterable, AsyncIterator, Callable, TypeVar, overload
+from typing import AsyncGenerator, AsyncIterable, Callable, TypeVar, overload
 from typing_extensions import TypeGuard
 
 _T = TypeVar("_T")
-
-
-@overload
-async def anext(__async_iterator: AsyncIterator[_T]) -> _T: ...
-
-_VT = TypeVar("_VT")
-
-
-@overload
-async def anext(
-    __async_iterator: AsyncIterator[_T], __default: _VT
-) -> _T | _VT: ...
-
-
-class _undefined:
-    pass
-
-
-_UNDEFINED = _undefined()
-
-
-async def anext(async_iterator: AsyncIterator, __default: any = _UNDEFINED):
-    """async next"""
-    try:
-        return await async_iterator.__anext__()
-    except StopAsyncIteration:
-        if __default is not _UNDEFINED:
-            return __default
-        raise
-
 _S = TypeVar("_S")
 
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import datetime
 from enum import IntEnum
-from typing import ClassVar, Final, Iterable, TypedDict
+from typing import ClassVar, Final, TypedDict
 from typing_extensions import TypeGuard
 
-from ..utils import afilter, amap, anext
+from ..utils import afilter, amap
 
 from ..commands import (
     CommandRequestTypes,
@@ -158,7 +158,8 @@ class System:
             )
 
             result = await anext(
-                amap(Command.get_value, afilter(Command.is_response, responses)),
+                amap(Command.get_value, afilter(
+                    Command.is_response, responses)),
                 None,
             )
 
@@ -397,7 +398,8 @@ class _timezone(datetime.tzinfo):
     def get_or_create(cls, dst_info: DaylightSavingsTimeInfo, time_info: TimeValueInfo):
         """Get existing or create new"""
         return cls._cache.setdefault(
-            (dst_info["enable"], time_info["timeZone"]), _timezone(dst_info, time_info)
+            (dst_info["enable"], time_info["timeZone"]
+             ), _timezone(dst_info, time_info)
         )
 
     def tzname(self, __dt: datetime.datetime | None):

@@ -1,7 +1,7 @@
 """System Abilities Typings"""
 
 from enum import IntEnum, IntFlag
-from typing import Callable, Generic, TypeVar, get_args
+from typing import Callable, Generic, TypeVar
 
 
 class Permission(IntFlag):

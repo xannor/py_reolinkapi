@@ -6,11 +6,9 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import (
     AsyncIterable,
-    Callable,
     Final,
     Generic,
     Iterable,
-    Optional,
     Protocol,
     Type,
     TypeVar,
