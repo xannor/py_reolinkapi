@@ -2,17 +2,7 @@
 
 from __future__ import annotations
 from enum import IntEnum
-from typing import TYPE_CHECKING, NewType
-
-if TYPE_CHECKING:  # typechecker is having issues with the backport
-    from enum import Enum
-
-    class StrEnum(str, Enum):
-        """String Enum"""
-
-        # pylint: disable=no-self-argument
-        def _generate_next_value_(name, *_):
-            return name.lower()
+from typing import NewType
 
 
 class OnOffState(IntEnum):

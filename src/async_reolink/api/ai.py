@@ -6,7 +6,9 @@ from enum import auto
 from typing import Final, Mapping, NewType, TypedDict
 from typing_extensions import TypeGuard
 
-from .typing import BoolState, OnOffState, StrEnum
+from backports.strenum import StrEnum
+
+from .typing import BoolState, OnOffState
 
 from .utils import afilter, amap
 
