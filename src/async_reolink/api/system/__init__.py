@@ -7,7 +7,7 @@ from enum import IntEnum
 from typing import ClassVar, Final, TypedDict
 from typing_extensions import TypeGuard
 
-from ..utils import afilter, amap
+from ..utils import afilter, alist, amap
 
 from ..commands import (
     CommandRequestTypes,
@@ -226,6 +226,19 @@ class System:
         """Get DST Info"""
         await self._ensure_time()
         return self.__timeinfo
+
+    async def reboot(self):
+        """Reboot device"""
+
+        Command = RebootCommand
+
+        if isinstance(self, connection.Connection):
+            responses = async_trap_errors(self._execute(Command()))
+        else:
+            return False
+
+        await alist(responses)  # eat all results looking for errors
+        return True
 
 
 class GetAbilityResponseValue(TypedDict):
@@ -456,3 +469,14 @@ def as_dateime(value: TimeValueType, *, tzinfo: datetime.tzinfo | None = None):
         value["sec"],
         tzinfo=tzinfo,
     )
+
+
+class RebootCommand(CommandRequest):
+    """Reboot Command"""
+
+    COMMAND: Final = "Reboot"
+
+    def __init__(
+        self, action: CommandRequestTypes = CommandRequestTypes.VALUE_ONLY
+    ) -> None:
+        super().__init__(type(self).COMMAND, action)

@@ -59,7 +59,8 @@ class ErrorCodes(ErrorCode, Enum):
         "maximum number of users",
         "Reached the maximum number of users",
     )
-    SAME_VERSION = (-30, "same version", "The version is identical to the current one.")
+    SAME_VERSION = (-30, "same version",
+                    "The version is identical to the current one.")
     BUSY = (-31, "busy", "Ensure only one user can upgrade")
     IP_CONFLICT = (-32, "ip conflict", "Modify IP conflicted with used IP")
     CLOUD_EMAIL = (-34, "need bing email", "Cloud login need bind email first")
@@ -73,16 +74,20 @@ class ErrorCodes(ErrorCode, Enum):
     CLOUD_UID = (-38, "uid err", "Cloud bind camera uid error")
     CLOUD_USER = (-39, "user not exist", "Cloud login user doesn’t exist")
     CLOUD_UNBIND = (-40, "unbind failed", "Cloud unbind camera failed")
-    CLOUD_NOT_USSPORTED = (-41, "cloud not support", "The device doesn’t support cloud")
-    CLOUD_LOGIN = (-42, "login cloud server failed", "Cloud login server failed")
+    CLOUD_NOT_USSPORTED = (-41, "cloud not support",
+                           "The device doesn’t support cloud")
+    CLOUD_LOGIN = (-42, "login cloud server failed",
+                   "Cloud login server failed")
     CLOUD_BIND = (-43, "bind failed", "Cloud bind camera failed")
     CLOUD_UNKNOWN = (-44, "cloud unknown err", "Cloud unknown error")
-    CLOUD_VERIFY = (-45, "need verify code", "Cloud bind camera need verify code")
+    CLOUD_VERIFY = (-45, "need verify code",
+                    "Cloud bind camera need verify code")
     SNAP_FAILED = (-48, "Fetching a picture failed", "Snap a picture failed")
     INVALID_CHANNEL = (-49, "Channel invalid", "Channel is invalid")
     EMPTY = (-99, "", "")
     TEST = (-100, "test failed", "Test Email、Ftp、Wifi failed")
-    UPGRADE_CHECK = (-101, "check firmware failed", "Upgrade checking firmware failed")
+    UPGRADE_CHECK = (-101, "check firmware failed",
+                     "Upgrade checking firmware failed")
     UPGRADE_DOWNLOAD = (
         -102,
         "download online failed",
@@ -103,10 +108,12 @@ class ErrorCodes(ErrorCode, Enum):
     FTP_UPLOAD = (-453, "ftp upload failed", "Upload ftp file failed")
     FTP = (-454, "ftp connect failed", "Cannot connect ftp server")
     EMAIL_UNKNOWN = (-480, "email undefined failed", "Some undifined errors")
-    EMAIL_CONNECT = (-481, "email connect failed", "Cannot connect email server")
+    EMAIL_CONNECT = (-481, "email connect failed",
+                     "Cannot connect email server")
     EMAIL_AUTH = (-482, "email auth failed", "Auth user failed")
     EMAIL = (-483, "email network err", "Email network err")
-    EMAIL_SERVER = (-484, "email server err", "Something wrong with email server")
+    EMAIL_SERVER = (-484, "email server err",
+                    "Something wrong with email server")
     EMAIL_MEMORY = (-485, "email memory err", "Something wrong with memory")
 
 
@@ -126,18 +133,20 @@ class ReolinkResponseError(ReolinkError):
     """Reolink Response Error"""
 
     def __init__(
-        self, *args: object, code: ErrorCodes | None = None, details: str | None = None
+        self, *args: object, code: ErrorCodes | int | None = None, details: str | None = None
     ) -> None:
-        super().__init__(*args)
+        super().__init__(*args, details or (code.description if code is not None else None))
         self._code = code
         self._details = details
 
     @property
     def code(self):
+        """Error Code"""
         return self._code
 
     @property
     def details(self):
+        """Error Details"""
         return self._details
 
 

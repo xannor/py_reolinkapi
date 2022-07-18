@@ -234,11 +234,11 @@ COMMAND_RESPONSE_ERROR: Final = "error"
 class TrapCallback(Protocol):
     """Error Trap"""
 
-    def __call__(self, code: ErrorCodes, details: str | None = None) -> any:
+    def __call__(self, code: ErrorCodes | int, details: str | None = None) -> any:
         ...
 
 
-def _raise_response_error(code: ErrorCodes, details: str | None = None) -> bool:
+def _raise_response_error(code: ErrorCodes | int, details: str | None = None) -> bool:
     raise ReolinkResponseError(code=code, details=details)
 
 
@@ -283,7 +283,10 @@ async def async_trap_errors(
             break
         if CommandRequest.is_error(response):
             error = response["error"]
-            code = ErrorCodes(error["rspCode"])
+            try:
+                code = ErrorCodes(error["rspCode"])
+            except ValueError:
+                code = error["rspCode"]
             if __trap:
                 _r = not __trap(code, error["detail"])
             else:
