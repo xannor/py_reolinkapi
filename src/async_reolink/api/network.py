@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Final, TypedDict, cast, TypeGuard
 
 from backports.strenum import StrEnum
 
+from .typing import IntBool
+
 from .utils import afilter, amap
 
 from .commands import (
@@ -48,7 +50,7 @@ class ChannelStatusType(TypedDict, total=False):
 
     channel: int
     name: str
-    online: bool
+    online: IntBool
     typeInfo: str
 
 
@@ -64,24 +66,24 @@ class RTSPUrlsType(TypedDict, total=False):
 class NetworkPortsType(TypedDict, total=False):
     """Network Ports"""
 
-    httpEnable: bool
+    httpEnable: IntBool
     httpPort: int
-    httpsEnable: bool
+    httpsEnable: IntBool
     httpsPort: int
-    mediaEnable: bool
+    mediaEnable: IntBool
     mediaPort: int
-    onvifEnable: bool
+    onvifEnable: IntBool
     onvifPort: int
-    rtmpEnable: bool
+    rtmpEnable: IntBool
     rtmpPort: int
-    rtspnable: bool
+    rtspEnable: IntBool
     rtspPort: int
 
 
 class P2PInfoType(TypedDict, total=False):
     """P2P Info"""
 
-    enable: bool
+    enable: IntBool
     uid: str
 
 
@@ -204,7 +206,8 @@ class Network:
 
             if isinstance(self, connection.Connection):
                 responses = async_trap_errors(
-                    self._execute(Command(), _ignore_errors))
+                    self._execute(Command()), __trap=_ignore_errors
+                )
 
                 result = await anext(
                     amap(Command.get_value, afilter(
