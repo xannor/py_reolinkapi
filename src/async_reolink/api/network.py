@@ -1,8 +1,7 @@
 """Network 3.3"""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, TypedDict, cast
-from typing_extensions import TypeGuard
+from typing import TYPE_CHECKING, Final, TypedDict, cast, TypeGuard
 
 from backports.strenum import StrEnum
 

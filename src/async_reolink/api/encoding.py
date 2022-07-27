@@ -1,7 +1,6 @@
 """Encoding"""
 
-from typing import Final, TypedDict
-from typing_extensions import TypeGuard
+from typing import Final, TypedDict, TypeGuard
 
 from .utils import afilter, amap
 

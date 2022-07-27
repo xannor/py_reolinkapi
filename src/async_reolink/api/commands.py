@@ -11,13 +11,14 @@ from typing import (
     Iterable,
     Protocol,
     Type,
+    TypeGuard,
     TypeVar,
     TypedDict,
     Mapping,
     Literal,
     overload,
 )
-from typing_extensions import NotRequired, TypeGuard
+from typing_extensions import NotRequired
 
 from .errors import ErrorCodes, ReolinkResponseError
 

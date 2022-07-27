@@ -1,8 +1,7 @@
 """LED 3.10"""
 
 from dataclasses import dataclass
-from typing import Final, Literal, TypedDict
-from typing_extensions import TypeGuard
+from typing import Final, Literal, TypedDict, TypeGuard
 
 from backports.strenum import StrEnum
 

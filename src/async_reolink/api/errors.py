@@ -115,6 +115,8 @@ class ErrorCodes(ErrorCode, Enum):
     EMAIL_SERVER = (-484, "email server err",
                     "Something wrong with email server")
     EMAIL_MEMORY = (-485, "email memory err", "Something wrong with memory")
+    PASSWORD_WRONG = (-502, "password is wrong",
+                      "The password you provided is incorrect.")
 
 
 class ReolinkError(Exception):

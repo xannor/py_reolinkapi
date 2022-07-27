@@ -3,8 +3,7 @@
 from __future__ import annotations
 from enum import auto
 
-from typing import Final, Mapping, NewType, TypedDict
-from typing_extensions import TypeGuard
+from typing import Final, Mapping, NewType, TypedDict, TypeGuard
 
 from backports.strenum import StrEnum
 

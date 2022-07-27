@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from time import time
-from typing import Final, Iterable, MutableMapping, TypedDict
-from typing_extensions import TypeGuard
+from typing import Final, Iterable, MutableMapping, TypedDict, TypeGuard
 
 from .errors import ReolinkStreamResponseError
 

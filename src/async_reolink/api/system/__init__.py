@@ -4,8 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import datetime
 from enum import IntEnum
-from typing import ClassVar, Final, TypedDict
-from typing_extensions import TypeGuard
+from typing import ClassVar, Final, TypedDict, TypeGuard
 
 from ..utils import afilter, alist, amap
 

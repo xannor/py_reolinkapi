@@ -96,6 +96,12 @@ class _Abilities:
         super().__init__(**kwargs)
         self._abilities = abilities
 
+    def __repr__(self) -> str:
+        properties = ",".join((f"{k}: {repr(getattr(self, k))}"
+                               for k in self.__dir__() if not k.startswith('_')))
+
+        return f"<{self.__class__.__name__}:{{{properties}}}"
+
 
 class _AlarmHddAbilities(_Abilities):
     @property
@@ -166,6 +172,7 @@ class _RecordAbilities(_Abilities):
 
 
 class Abilities(_Abilities):
+
     @property
     def alarm(self):
         return _AlarmAbilities(self._abilities)

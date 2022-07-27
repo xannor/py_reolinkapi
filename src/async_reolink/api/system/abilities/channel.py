@@ -96,10 +96,14 @@ class PTZTypeValues(IntEnum):
 
     NONE = 0
     AF = 1
+    """Auto Focus"""
     PTZ = 2
+    """Pan Tilt Zoom"""
     PT = 3
+    """Pan Tilt"""
     BALL = 4
     PTZ_NO_SPEED = 5
+    """Pan Tilt Zoom, no speed control"""
 
 
 class _PTZTypeAbility(Ability[PTZTypeValues]):
@@ -115,6 +119,7 @@ class PTZControlValues(IntEnum):
     NONE = 0
     ZOOM = 1
     ZOOM_FOCUS = 2
+    """Zoom and Focus"""
 
 
 class _PTZControlAbility(Ability[PTZControlValues]):
@@ -130,8 +135,10 @@ class _PTZControlAbility(Ability[PTZControlValues]):
 class PTZDirectionValues(IntEnum):
     """PTZ Direction Ability Values"""
 
-    AUTOSCAN_8 = 0
-    NO_AUTOACAN_4 = 1
+    EIGHT_AUTO = 0
+    """8 directions with auto scan"""
+    FOUR_NO_AUTO = 1
+    """4 directions, no auto scan"""
 
 
 class _PTZDirectionAbility(Ability[PTZDirectionValues]):
@@ -139,7 +146,7 @@ class _PTZDirectionAbility(Ability[PTZDirectionValues]):
         super().__init__(
             ability=ability,
             factory=PTZDirectionValues,
-            default=PTZDirectionValues.AUTOSCAN_8,
+            default=PTZDirectionValues.EIGHT_AUTO,
             **kwargs
         )
 
@@ -148,6 +155,12 @@ class _Abilities:
     def __init__(self, abilities: dict, **kwargs) -> None:
         super().__init__(**kwargs)
         self._abilities = abilities
+
+    def __repr__(self) -> str:
+        properties = ",".join((f"{k}: {repr(getattr(self, k))}"
+                               for k in self.__dir__() if not k.startswith('_')))
+
+        return f"<{self.__class__.__name__}:{{{properties}}}"
 
 
 class _PTZAbilities(_Abilities):
@@ -459,3 +472,8 @@ class ChannelsAbilities(Sequence[_ChannelAbilities]):
 
     def __getitem__(self, __k: SupportsIndex):
         return _ChannelAbilities(abilities=self._data[__k])
+
+    def __repr__(self) -> str:
+        values = ",".join(repr(c) for c in self.__iter__())
+
+        return f"<{self.__class__.__name__}:[{values}]"

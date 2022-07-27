@@ -4,8 +4,7 @@ from abc import ABC
 from dataclasses import dataclass
 import inspect
 from time import time
-from typing import Callable, Final, AsyncIterable, TypedDict
-from typing_extensions import TypeGuard
+from typing import Callable, Final, AsyncIterable, TypedDict, TypeGuard
 
 from .system import User
 

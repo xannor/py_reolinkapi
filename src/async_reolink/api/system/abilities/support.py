@@ -8,6 +8,12 @@ class _Abilities:
         super().__init__(**kwargs)
         self._abilities = abilities
 
+    def __repr__(self) -> str:
+        properties = ",".join((f"{k}: {repr(getattr(self, k))}"
+                               for k in self.__dir__() if not k.startswith('_')))
+
+        return f"<{self.__class__.__name__}:{{{properties}}}"
+
 
 class _AudioAlarmAbilities(_Abilities, BooleanAbility):
     def __init__(self, abilities: dict, **kwargs) -> None:

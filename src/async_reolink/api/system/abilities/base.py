@@ -75,7 +75,7 @@ class Ability(_Ability, Generic[_T]):
         return getattr(value, __name)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__}:{repr(self._get_permit())}|{repr(self._get_ver())}>"
+        return f"<{self.__class__.__name__}:{repr(self._get_permit())} {repr(self._get_ver())}>"
 
     def __bool__(self) -> bool:
         return bool(self._get_ver())
