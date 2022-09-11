@@ -7,12 +7,7 @@ from typing import AsyncIterable, Callable, Coroutine, Iterable
 
 from .const import DEFAULT_TIMEOUT
 
-from .commands import (
-    CommandRequest,
-    CommandResponseType,
-    TrapCallback,
-    async_trap_errors,
-)
+from .commands import CommandRequest, CommandResponse
 
 
 class Connection(ABC):
@@ -61,17 +56,13 @@ class Connection(ABC):
         """disconnect from device"""
 
     @abstractmethod
-    def _execute(
-        self, *args: CommandRequest
-    ) -> AsyncIterable[CommandResponseType | bytes]:
+    def _execute(self, *args: CommandRequest) -> AsyncIterable[CommandResponse | bytes]:
         ...
 
     def batch(
         self,
         commands: Iterable[CommandRequest],
-        *,
-        __trap: TrapCallback | None = None,
     ):
         """Execute a batch of commands"""
 
-        return async_trap_errors(self._execute(*commands), __trap=__trap)
+        return self._execute(*commands)
