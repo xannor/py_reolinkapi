@@ -15,7 +15,7 @@ from ..commands.ai import (
     SetAiConfigRequest,
 )
 
-from .typings import AITypes
+from .typings import AITypes, Config
 
 from .. import connection
 
@@ -38,7 +38,7 @@ class AI(ABC):
                     isinstance(response, GetAiStateResponse)
                     and response.channel_id == channel
                 ):
-                    return response
+                    return response.state
 
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Get AI State failed")
@@ -60,7 +60,7 @@ class AI(ABC):
                     isinstance(response, GetAiConfigResponse)
                     and response.channel_id == channel
                 ):
-                    return response
+                    return response.config
 
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Get AI State failed")
@@ -68,25 +68,19 @@ class AI(ABC):
         raise ReolinkResponseError("Get AI State failed")
 
     @abstractmethod
-    def _create_set_ai_config(
-        self,
-        channel: int,
-        detect: AITypes | set[AITypes] | Mapping[AITypes, bool] | None,
-        track: AITypes | set[AITypes] | Mapping[AITypes, bool] | None,
-    ) -> SetAiConfigRequest:
+    def _create_set_ai_config(self, channel: int, config: Config) -> SetAiConfigRequest:
         ...
 
     async def set_ai_config(
         self,
+        config: Config,
         channel: int = 0,
-        detect: AITypes | set[AITypes] | Mapping[AITypes, bool] | None = None,
-        track: AITypes | set[AITypes] | Mapping[AITypes, bool] | None = None,
     ):
         """Set AI Configuration"""
 
         if isinstance(self, connection.Connection):
             async for response in self._execute(
-                self._create_set_ai_config(channel, detect, track)
+                self._create_set_ai_config(channel, config)
             ):
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Set AI State failed")

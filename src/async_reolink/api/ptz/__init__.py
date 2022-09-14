@@ -1,7 +1,6 @@
 """PTZ 3.7"""
 
 from abc import ABC, abstractmethod
-from typing import NamedTuple
 
 from .. import connection
 from ..commands import CommandErrorResponse, ResponseCode, ptz
@@ -9,13 +8,6 @@ from ..commands import CommandErrorResponse, ResponseCode, ptz
 from ..errors import ReolinkResponseError
 
 from ..ptz.typings import Operation, Preset, Patrol, Track, ZoomOperation
-
-
-class ZoomFocus(NamedTuple):
-    """Zoom and focus tuple"""
-
-    zoom: int
-    focus: int
 
 
 class PTZ(ABC):
@@ -226,7 +218,7 @@ class PTZ(ABC):
                 self._create_get_ptz_zoom_focus_request(channel)
             ):
                 if isinstance(response, ptz.GetZoomFocusResponse):
-                    return ZoomFocus(response.zoom, response.focus)
+                    return response.state
 
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Get PTZ Zoom Focus failed")

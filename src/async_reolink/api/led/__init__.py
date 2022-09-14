@@ -5,7 +5,7 @@ from typing import Mapping, Sequence
 
 from ..ai.typings import AITypes
 
-from ..led.typings import LightStates, LightingSchedule
+from ..led.typings import LightStates, LightingSchedule, WhiteLedInfo
 
 from ..typings import PercentValue
 
@@ -129,32 +129,21 @@ class LED(ABC):
     @abstractmethod
     def _create_set_white_led_request(
         self,
-        state: LightStates,
-        brightness: PercentValue | None,
-        mode: int | None,
-        schedule: LightingSchedule | None,
-        ai_detect: Mapping[AITypes, bool] | Sequence[AITypes] | AITypes | None,
+        info: WhiteLedInfo,
         channel: int,
     ) -> led.SetWhiteLedRequest:
         ...
 
     async def set_white_led(
         self,
-        state: LightStates,
-        *,
-        brightness: PercentValue = None,
-        mode: int = None,
-        schedule: LightingSchedule = None,
-        ai_detect: Mapping[AITypes, bool] | Sequence[AITypes] | AITypes = None,
+        value: WhiteLedInfo,
         channel: int = 0,
     ):
         """Set White Led State"""
 
         if isinstance(self, connection.Connection):
             async for response in self._execute(
-                self._create_set_white_led_request(
-                    state, brightness, mode, schedule, ai_detect, channel
-                )
+                self._create_set_white_led_request(value, channel)
             ):
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Set White Led failed")

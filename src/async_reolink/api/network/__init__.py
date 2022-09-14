@@ -189,7 +189,7 @@ class Network(ABC):
 
         if isinstance(self, connection.Connection):
             async for response in self._execute(
-                self._create_get_channel_status_request()
+                self._create_get_p2p_request()
             ):
                 if isinstance(response, GetP2PResponse):
                     return response.info

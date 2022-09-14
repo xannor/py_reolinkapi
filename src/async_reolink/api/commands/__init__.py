@@ -1,7 +1,6 @@
 """Commands"""
 
-from abc import ABC
-from typing import Any, Protocol, Type, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..errors import ReolinkResponseError
 
@@ -38,7 +37,7 @@ class CommandErrorResponse(CommandResponse, ErrorResponseValue, Protocol):
 
     def throw(self, *args):
         """throw as error"""
-        raise ReolinkResponseError(*args, self.error_code, self.details)
+        raise ReolinkResponseError(*args, code = self.error_code, details= self.details)
 
 
 class CommandRequest(Protocol):

@@ -5,6 +5,13 @@ from typing import Annotated, Protocol, Sequence
 from ..typings import size
 
 
+class ZoomFocus(Protocol):
+    """PTZ Zoom/Focus"""
+
+    zoom: Annotated[int, range(1, 64)]
+    focus: Annotated[int, range(1, 64)]
+
+
 class Preset(Protocol):
     """PTZ Preset"""
 

@@ -3,7 +3,7 @@
 from abc import ABC
 from typing import Annotated, Mapping, MutableSequence
 
-from ..ptz.typings import Operation, Preset, Patrol, Track, ZoomOperation
+from ..ptz.typings import Operation, Preset, Patrol, Track, ZoomFocus, ZoomOperation
 from . import CommandRequest, ChannelValue, CommandResponse
 
 
@@ -11,7 +11,7 @@ class GetPresetRequest(CommandRequest, ChannelValue, ABC):
     """Get Presets Request"""
 
 
-class GetPresetResponse(CommandResponse, ABC):
+class GetPresetResponse(CommandResponse, ChannelValue, ABC):
     """Get Presets Response"""
 
     presets: Mapping[int, Preset]
@@ -27,7 +27,7 @@ class GetPatrolRequest(CommandRequest, ChannelValue, ABC):
     """Get Patrol"""
 
 
-class GetPatrolResponse(CommandResponse, ABC):
+class GetPatrolResponse(CommandResponse, ChannelValue, ABC):
     """Get Patrol Response"""
 
     patrols: Mapping[int, Patrol]
@@ -87,8 +87,7 @@ class GetZoomFocusRequest(CommandRequest, ChannelValue, ABC):
 class GetZoomFocusResponse(CommandResponse, ChannelValue, ABC):
     """Get Zoom/Focus Response"""
 
-    focus: Annotated[int, range(1, 64)]
-    zoom: Annotated[int, range(1, 64)]
+    state: ZoomFocus
 
 
 class SetZoomFocusRequest(CommandRequest, ChannelValue, ABC):
