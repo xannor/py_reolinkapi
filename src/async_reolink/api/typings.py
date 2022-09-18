@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from datetime import date, datetime, time
-from enum import IntEnum, auto
+from enum import Enum, auto
 from typing import Annotated, Protocol
 
 
@@ -44,10 +44,10 @@ SecondsValue = Annotated[int, range(0, 59)]
 """Integer representing clock seconds range, 0-59 """
 
 
-class WeekDays(IntEnum):
+class WeekDays(Enum):
     """Day of the week"""
 
-    MONDAY = 0
+    MONDAY = auto()
     TUESDAY = auto()
     WEDNESDAY = auto()
     THURSDAY = auto()
@@ -93,9 +93,9 @@ class DateTimeValue(DateValue, TimeValue, Protocol):
         return datetime.combine(self.to_date(), self.to_time())
 
 
-class StreamTypes(IntEnum):
+class StreamTypes(Enum):
     """Stream Types"""
 
-    MAIN = 0
+    MAIN = auto()
     SUB = auto()
     EXT = auto()

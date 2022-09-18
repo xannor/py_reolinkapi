@@ -2,7 +2,7 @@
 
 from abc import ABC
 from datetime import date, datetime, timedelta, timezone
-from enum import IntEnum, auto
+from enum import Enum, auto
 from typing import Annotated, Protocol
 
 from ..typings import DateTimeValue, TimeValue, WeekDays
@@ -42,10 +42,10 @@ class DeviceInfo(Protocol):
     pak_suffix: str
 
 
-class HourFormat(IntEnum):
+class HourFormat(Enum):
     """Hour Format"""
 
-    HR_24 = 0
+    HR_24 = auto()
     HR_12 = auto()
 
 
@@ -67,6 +67,8 @@ class DaylightSavingsTimeInfo(Protocol):
             _date = date(year, self.month, 1)
             delta = timedelta(weeks=self.week, days=int(self.week))
             delta -= timedelta(days=_date.weekday())
+            if self.weekday != WeekDays.MONDAY:
+                delta += timedelta(days=self.weekday.value - WeekDays.MONDAY.value)
             _date += delta
             return datetime.combine(_date, self.to_time())
 

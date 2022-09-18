@@ -1,13 +1,12 @@
 """Abilities"""
 
-from enum import IntEnum, IntFlag, auto
+from enum import Enum, Flag, auto
 from typing import Mapping, Protocol, TypeVar
 
 
-class Permissions(IntFlag):
+class Permissions(Flag):
     """Ability Permissions"""
 
-    NONE = 0
     OPTION = auto()
     WRITE = auto()
     READ = auto()
@@ -23,27 +22,24 @@ class Capability(Protocol[_T]):
     permissions: Permissions
 
 
-class CloudStorage(IntFlag):
+class CloudStorage(Flag):
     """Cloud Storage Capabilities"""
 
-    NONE = 0
     UPLOAD = auto()
     CONFIG = auto()
     DEPLOY = auto()
 
 
-class DayNight(IntEnum):
+class DayNight(Enum):
     """Day/Night"""
 
-    NONE = 0
     DAY_NIGHT = auto()
     THRESHOLD = auto()
 
 
-class DDns(IntEnum):
+class DDns(Enum):
     """DDNS"""
 
-    NONE = 0
     SWAN = auto()
     THREE322 = auto()
     """3322"""
@@ -59,11 +55,9 @@ class DDns(IntEnum):
     DYNDNS_NOIP = auto()
 
 
-class Email(IntEnum):
+class Email(Enum):
     """Email"""
 
-    NONE = 0
-    """Mail function not supported"""
     JPEG = auto()
     """Supports JPEG attachments"""
     VIDEO_JPEG = auto()
@@ -72,25 +66,23 @@ class Email(IntEnum):
     """Supports video and JPEG attachments and sender nickname"""
 
 
-class EncodingType(IntEnum):
+class EncodingType(Enum):
     """Encoding Type"""
 
-    H264 = 0
+    H264 = auto()
     H265 = auto()
 
 
-class FloodLight(IntEnum):
+class FloodLight(Enum):
     """Flood Light"""
 
-    NONE = 0
     WHITE = auto()
     AUTO = auto()
 
 
-class Ftp(IntEnum):
+class Ftp(Enum):
     """FTP"""
 
-    NONE = 0
     STREAM = auto()
     JPEG_STREAM = auto()
     MODE = auto()
@@ -99,44 +91,40 @@ class Ftp(IntEnum):
     JPEG_STREAM_MODE_TYPE = auto()
 
 
-class Live(IntEnum):
+class Live(Enum):
     """Live"""
 
-    NONE = 0
     MAIN_EXTERN_SUB = auto()
     MAIN_SUB = auto()
 
 
-class Osd(IntEnum):
+class Osd(Enum):
     """Osd"""
 
-    NONE = 0
     SUPPORTED = auto()
     DISTINCT = auto()
 
 
-class PTZControl(IntEnum):
+class PTZControl(Enum):
     """PTZ Control"""
 
-    NONE = 0
     ZOOM = auto()
     ZOOM_FOCUS = auto()
     """Zoom and Focus"""
 
 
-class PTZDirection(IntEnum):
+class PTZDirection(Enum):
     """PTZ Direction"""
 
-    EIGHT_AUTO = 0
+    EIGHT_AUTO = auto()
     """8 directions with auto scan"""
     FOUR_NO_AUTO = auto()
     """4 directions, no auto scan"""
 
 
-class PTZType(IntEnum):
+class PTZType(Enum):
     """PTZ Type"""
 
-    NONE = 0
     AF = auto()
     """Auto Focus"""
     PTZ = auto()
@@ -148,43 +136,39 @@ class PTZType(IntEnum):
     """Pan Tilt Zoom, no speed control"""
 
 
-class RecordSchedule(IntEnum):
+class RecordSchedule(Enum):
     """Record Schedule"""
 
-    NONE = 0
     MOTION = auto()
     MOTION_LIVE = auto()
     """Motion detection and normal recording"""
 
 
-class ScheduleVersion(IntEnum):
+class ScheduleVersion(Enum):
     """Schedule Version"""
 
-    BASIC = 0
+    BASIC = auto()
     V20 = auto()
     "v2.0"
 
 
-class Time(IntEnum):
+class Time(Enum):
     """Time"""
 
-    NONE = 0
     SUNDAY = auto()
     ANYDAY = auto()
 
 
-class Upgrade(IntEnum):
+class Upgrade(Enum):
     """Upgrade"""
 
-    NONE = 0
     MANUAL = auto()
     ONLINE = auto()
 
 
-class VideoClip(IntEnum):
+class VideoClip(Enum):
     """Video Clip"""
 
-    NONE = 0
     FIXED = auto()
     MOD = auto()
 
@@ -219,7 +203,7 @@ class ChannelCapabilities(Protocol):
     camera_mode: Capability[bool]
     disable_autofocus: Capability[bool]
     enc: Capability[bool]
-    floodlight: Capability[bool]
+    floodlight: Capability[FloodLight]
     ftp: Capability[Ftp]
     image: Capability[bool]
     indicator_light: Capability[bool]
@@ -375,7 +359,7 @@ class Capabilities(Protocol):
     disk: Capability[bool]
     display: Capability[bool]
 
-    class Email(Capability[bool], Protocol):
+    class Email(Capability[Email], Protocol):
         """Email"""
 
         interval: Capability[bool]
