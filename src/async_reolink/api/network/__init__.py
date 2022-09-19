@@ -4,19 +4,7 @@ from abc import ABC, abstractmethod
 
 from ..errors import ReolinkResponseError
 
-from ..commands import CommandErrorResponse, CommandResponse
-from ..commands.network import (
-    GetChannelStatusRequest,
-    GetChannelStatusResponse,
-    GetLocalLinkRequest,
-    GetLocalLinkResponse,
-    GetNetworkPortsRequest,
-    GetNetworkPortsResponse,
-    GetRTSPUrlsRequest,
-    GetRTSPUrlsResponse,
-    GetP2PRequest,
-    GetP2PResponse,
-)
+from ..commands import CommandErrorResponse, CommandResponse, network
 
 from ..typings import StreamTypes
 
@@ -41,7 +29,7 @@ class Network(ABC):
         self.__ports = None
 
     @abstractmethod
-    def _create_get_local_link_request(self) -> GetLocalLinkRequest:
+    def _create_get_local_link_request(self) -> network.GetLocalLinkRequest:
         ...
 
     async def get_local_link(self):
@@ -50,7 +38,7 @@ class Network(ABC):
         self.__link = None
         if isinstance(self, connection.Connection):
             async for response in self._execute(self._create_get_local_link_request()):
-                if isinstance(response, GetLocalLinkResponse):
+                if isinstance(response, network.GetLocalLinkResponse):
                     link = response.local_link
                     self.__link = link
                     return link
@@ -61,7 +49,7 @@ class Network(ABC):
         raise ReolinkResponseError("Get local link failed")
 
     @abstractmethod
-    def _create_get_channel_status_request(self) -> GetChannelStatusRequest:
+    def _create_get_channel_status_request(self) -> network.GetChannelStatusRequest:
         ...
 
     async def get_channel_status(self):
@@ -71,7 +59,7 @@ class Network(ABC):
             async for response in self._execute(
                 self._create_get_channel_status_request()
             ):
-                if isinstance(response, GetChannelStatusResponse):
+                if isinstance(response, network.GetChannelStatusResponse):
                     return response.channels
 
                 if isinstance(response, CommandErrorResponse):
@@ -80,7 +68,7 @@ class Network(ABC):
         raise ReolinkResponseError("Get channel status failed")
 
     @abstractmethod
-    def _create_get_ports_request(self) -> GetNetworkPortsRequest:
+    def _create_get_ports_request(self) -> network.GetNetworkPortsRequest:
         ...
 
     async def get_ports(self):
@@ -89,7 +77,7 @@ class Network(ABC):
         self.__ports = None
         if isinstance(self, connection.Connection):
             async for response in self._execute(self._create_get_ports_request()):
-                if isinstance(response, GetNetworkPortsResponse):
+                if isinstance(response, network.GetNetworkPortsResponse):
                     ports = response.ports
                     self.__ports = ports
                     return ports
@@ -120,13 +108,15 @@ class Network(ABC):
             return
 
         async for response in responses:
-            if isinstance(response, GetLocalLinkResponse):
+            if isinstance(response, network.GetLocalLinkResponse):
                 self.__link = response.local_link
-            elif isinstance(response, GetNetworkPortsResponse):
+            elif isinstance(response, network.GetNetworkPortsResponse):
                 self.__ports = response.ports
 
     @abstractmethod
-    def _create_get_rtsp_urls_request(self, channel_id: int = 0) -> GetRTSPUrlsRequest:
+    def _create_get_rtsp_urls_request(
+        self, channel_id: int = 0
+    ) -> network.GetRTSPUrlsRequest:
         ...
 
     async def get_rtsp_url(
@@ -148,7 +138,7 @@ class Network(ABC):
                 async for response in self._execute(
                     self._create_get_rtsp_urls_request(0)
                 ):
-                    if isinstance(response, GetRTSPUrlsResponse):
+                    if isinstance(response, network.GetRTSPUrlsResponse):
                         return response.urls[stream]
 
             self.__no_get_rtsp = True
@@ -181,20 +171,50 @@ class Network(ABC):
         return url
 
     @abstractmethod
-    def _create_get_p2p_request(self) -> GetP2PRequest:
+    def _create_get_p2p_request(self) -> network.GetP2PRequest:
         ...
 
     async def get_p2p(self):
         """Get P2P"""
 
         if isinstance(self, connection.Connection):
-            async for response in self._execute(
-                self._create_get_p2p_request()
-            ):
-                if isinstance(response, GetP2PResponse):
+            async for response in self._execute(self._create_get_p2p_request()):
+                if isinstance(response, network.GetP2PResponse):
                     return response.info
 
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Get p2p info failed")
 
         raise ReolinkResponseError("Get p2p info failed")
+
+    def _create_get_wifi_info_request(self) -> network.GetWifiInfoRequest:
+        ...
+
+    async def get_wifi(self):
+        """Get Wifi Info"""
+
+        if isinstance(self, connection.Connection):
+            async for response in self._execute(self._create_get_wifi_info_request()):
+                if isinstance(response, network.GetWifiInfoResponse):
+                    return response.info
+
+                if isinstance(response, CommandErrorResponse):
+                    response.throw("Get wifi info failed")
+
+        raise ReolinkResponseError("Get wifi info failed")
+
+    def _create_get_wifi_signal_request(self) -> network.GetWifiSignalRequest:
+        ...
+
+    async def get_wifi_signal(self):
+        """Get Wifi Signal Strength"""
+
+        if isinstance(self, connection.Connection):
+            async for response in self._execute(self._create_get_wifi_signal_request()):
+                if isinstance(response, network.GetWifiSignalResponse):
+                    return response.signal
+
+                if isinstance(response, CommandErrorResponse):
+                    response.throw("Get wifi signal failed")
+
+        raise ReolinkResponseError("Get wifi signal failed")

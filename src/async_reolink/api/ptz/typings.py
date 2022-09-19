@@ -15,7 +15,6 @@ class ZoomFocus(Protocol):
 class Preset(Protocol):
     """PTZ Preset"""
 
-    channel_id: int
     id: Annotated[int, range(1, 64)]  # pylint: disable=invalid-name
     """Integer within 1 and 64"""
     name: Annotated[str, size(31)]
@@ -36,7 +35,6 @@ class PatrolPreset(Protocol):
 class Patrol(Protocol):
     """PTZ Patrol"""
 
-    channel_id: int
     enabled: bool
     id: Annotated[int, range(1, 64)]  # pylint: disable=invalid-name
     """Integer within 1 and 64"""

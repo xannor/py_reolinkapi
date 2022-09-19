@@ -3,9 +3,9 @@
 
 from abc import ABC
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Final
+from typing import Final, Mapping
 
-from ..system.typings import DaylightSavingsTimeInfo, DeviceInfo, TimeInfo
+from ..system.typings import DaylightSavingsTimeInfo, DeviceInfo, TimeInfo, StorageInfo
 
 from ..system.capabilities import Capabilities
 
@@ -113,5 +113,15 @@ class GetTimeResponse(CommandResponse, ABC):
         )
 
 
-class RebootRequest(CommandRequest):
-    """Reboot"""
+class RebootRequest(CommandRequest, ABC):
+    """Reboot Request"""
+
+
+class GetHddInfoRequest(CommandRequest, ABC):
+    """Get HDD Info Request"""
+
+
+class GetHddInfoResponse(CommandResponse, ABC):
+    """Get HDD Info Response"""
+
+    info: Mapping[int, StorageInfo]

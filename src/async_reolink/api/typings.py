@@ -74,6 +74,10 @@ class SimpleTimeValue(Protocol):
     hour: Annotated[int, range(0, 23)]
     minute: Annotated[int, range(0, 59)]
 
+    def to_time(self):
+        """convert TimeValue to time"""
+        return time(self.hour, self.minute, 0)
+
 
 class TimeValue(SimpleTimeValue, Protocol):
     """Time Value"""

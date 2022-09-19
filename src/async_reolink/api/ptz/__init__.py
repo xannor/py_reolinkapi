@@ -33,15 +33,17 @@ class PTZ(ABC):
         raise ReolinkResponseError("Get PTZ Presets failed")
 
     @abstractmethod
-    def _create_set_ptz_preset_request(self, preset: Preset) -> ptz.SetPresetRequest:
+    def _create_set_ptz_preset_request(
+        self, channel_id: int, preset: Preset
+    ) -> ptz.SetPresetRequest:
         ...
 
-    async def set_ptz_preset(self, preset: Preset):
+    async def set_ptz_preset(self, preset: Preset, channel: int = 0):
         """Set PTZ Preset"""
 
         if isinstance(self, connection.Connection):
             async for response in self._execute(
-                self._create_set_ptz_preset_request(preset)
+                self._create_set_ptz_preset_request(channel, preset)
             ):
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Set PTZ Preset failed")
@@ -71,15 +73,17 @@ class PTZ(ABC):
         raise ReolinkResponseError("Get PTZ Patrols failed")
 
     @abstractmethod
-    def _create_set_ptz_patrol_request(self, patrol: Patrol) -> ptz.SetPatrolRequest:
+    def _create_set_ptz_patrol_request(
+        self, channel_id: int, patrol: Patrol
+    ) -> ptz.SetPatrolRequest:
         ...
 
-    async def set_ptz_patrol(self, patrol: Patrol):
+    async def set_ptz_patrol(self, patrol: Patrol, channel: int = 0):
         """Set PTZ Patrol"""
 
         if isinstance(self, connection.Connection):
             async for response in self._execute(
-                self._create_set_ptz_patrol_request(patrol)
+                self._create_set_ptz_patrol_request(channel, patrol)
             ):
                 if isinstance(response, CommandErrorResponse):
                     response.throw("Set PTZ Preset failed")
@@ -110,7 +114,7 @@ class PTZ(ABC):
 
     @abstractmethod
     def _create_set_ptz_tatterns_request(
-        self, channel: int, *track: Track
+        self, channel_id: int, *track: Track
     ) -> ptz.SetTatternRequest:
         ...
 

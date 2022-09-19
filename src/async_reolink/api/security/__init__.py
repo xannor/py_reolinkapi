@@ -15,7 +15,13 @@ from ..commands import (
 
 from ..errors import ErrorCodes, ReolinkResponseError
 
-from ..commands.security import LoginRequest, LoginResponse, LogoutRequest
+from ..commands.security import (
+    LoginRequest,
+    LoginResponse,
+    LogoutRequest,
+    GetUserRequest,
+    GetUserResponse,
+)
 
 from .. import connection
 
@@ -107,3 +113,20 @@ class Security(ABC):
             finally:
                 # whether clean or not logout always succeeds
                 self._clear_login()
+
+    @abstractmethod
+    def _create_get_user_request(self) -> GetUserRequest:
+        ...
+
+    async def get_users(self):
+        """Get Device Users"""
+
+        if isinstance(self, connection.Connection):
+            async for response in self._execute(self._create_get_user_request()):
+                if isinstance(response, GetUserResponse):
+                    return response.users
+
+                if isinstance(response, CommandErrorResponse):
+                    response.throw("Get PTZ Zoom Focus failed")
+
+        raise ReolinkResponseError("Get PTZ Zoom Focus failed")

@@ -37,7 +37,7 @@ class CommandErrorResponse(CommandResponse, ErrorResponseValue, Protocol):
 
     def throw(self, *args):
         """throw as error"""
-        raise ReolinkResponseError(*args, code = self.error_code, details= self.details)
+        raise ReolinkResponseError(*args, code=self.error_code, details=self.details)
 
 
 class CommandRequest(Protocol):

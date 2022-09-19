@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from enum import Enum, auto
 from typing import Annotated, Protocol
 
-from ..typings import DateTimeValue, TimeValue, WeekDays
+from ..typings import DateTimeValue, SimpleTimeValue, WeekDays
 
 
 class DeviceInfo(Protocol):
@@ -42,6 +42,24 @@ class DeviceInfo(Protocol):
     pak_suffix: str
 
 
+class StorageTypes(Enum):
+    """Storage Types"""
+
+    HDD = auto()
+    SDC = auto()
+
+
+class StorageInfo(Protocol):
+    """HDD Info"""
+
+    id: int
+    capacity: int
+    formatted: bool
+    mounted: bool
+    free_space: int
+    type: StorageTypes
+
+
 class HourFormat(Enum):
     """Hour Format"""
 
@@ -55,7 +73,7 @@ class DaylightSavingsTimeInfo(Protocol):
     enabled: bool
     hour_offset: Annotated[int, range(1, 2)]
 
-    class TimeInfo(TimeValue, ABC):
+    class TimeInfo(SimpleTimeValue, ABC):
         """Time info"""
 
         month: Annotated[int, range(1, 12)]

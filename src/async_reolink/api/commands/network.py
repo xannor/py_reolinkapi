@@ -4,7 +4,7 @@ from abc import ABC
 from typing import Mapping
 from . import ChannelValue, CommandRequest, CommandResponse
 
-from ..network.typings import ChannelStatus, LinkInfo, NetworkPorts, P2PInfo
+from ..network.typings import ChannelStatus, LinkInfo, NetworkPorts, P2PInfo, WifiInfo
 
 from ..typings import StreamTypes
 
@@ -57,3 +57,23 @@ class GetP2PResponse(CommandResponse, ABC):
     """Get P2P Info Response"""
 
     info: P2PInfo
+
+
+class GetWifiInfoRequest(CommandRequest, ABC):
+    """Get Wifi Info Request"""
+
+
+class GetWifiInfoResponse(CommandResponse, ABC):
+    """Get Wifi Info Response"""
+
+    info: WifiInfo
+
+
+class GetWifiSignalRequest(CommandRequest, ABC):
+    """Get Wifi Signal Strength Request"""
+
+
+class GetWifiSignalResponse(CommandRequest, ABC):
+    """Get Wifi Signal Stength Response"""
+
+    signal: int

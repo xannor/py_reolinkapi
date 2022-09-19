@@ -21,6 +21,8 @@ from ..commands.system import (
     GetTimeRequest,
     GetTimeResponse,
     RebootRequest,
+    GetHddInfoRequest,
+    GetHddInfoResponse,
 )
 
 from .. import connection
@@ -138,6 +140,7 @@ class System(ABC):
             self.__timezone = _tz
         return self.__timezone
 
+    @abstractmethod
     def _create_reboot_request(self) -> RebootRequest:
         ...
 
@@ -153,3 +156,20 @@ class System(ABC):
                     response.throw("Reboot failed")
 
         raise ReolinkResponseError("Reboot failed")
+
+    @abstractmethod
+    def _create_get_hdd_info_request(self) -> GetHddInfoRequest:
+        ...
+
+    async def get_storage_info(self):
+        """Get Device Recording Capabilities"""
+
+        if isinstance(self, connection.Connection):
+            async for response in self._execute(self._create_get_hdd_info_request()):
+                if isinstance(response, GetHddInfoResponse):
+                    return response.info
+
+                if isinstance(response, CommandErrorResponse):
+                    response.throw("Get storage Info failed")
+
+        raise ReolinkResponseError("Get storage Info failed")

@@ -19,10 +19,19 @@ class IPInfo(Protocol):
     mask: str
 
 
+class DNSInfo(Protocol):
+    """DNS Info"""
+
+    auto: bool
+    dns_1: str
+    dns_2: str
+
+
 class LinkInfo(Protocol):
     """Link Info"""
 
     active_link: str
+    dns: DNSInfo
     mac: str
     type: LinkTypes
     ip: IPInfo
@@ -60,3 +69,10 @@ class NetworkPorts(Protocol):
     onvif: NetworkPort
     rtmp: NetworkPort
     rtsp: NetworkPort
+
+
+class WifiInfo(Protocol):
+    """Wifi Information"""
+
+    ssid: str
+    password: str
