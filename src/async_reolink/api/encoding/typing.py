@@ -2,7 +2,7 @@
 
 from typing import Mapping, Protocol
 
-from async_reolink.api.typings import StreamTypes
+from ..typing import StreamTypes
 
 
 class StreamEncodingInfo(Protocol):

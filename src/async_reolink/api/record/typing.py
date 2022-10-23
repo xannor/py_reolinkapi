@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Annotated, Iterable, Iterator, Protocol
 
-from ..typings import StreamTypes, DateTimeValue
+from ..typing import StreamTypes, DateTimeValue
 
 
 class Search(Protocol):

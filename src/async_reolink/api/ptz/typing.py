@@ -2,7 +2,7 @@
 from enum import Enum, auto
 from typing import Annotated, Protocol, Sequence
 
-from ..typings import size
+from ..typing import size
 
 
 class ZoomFocus(Protocol):

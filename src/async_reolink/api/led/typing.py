@@ -3,9 +3,8 @@
 from enum import Enum, auto
 from typing import Mapping, Protocol
 
-from ..ai import typings as ai
-
-from ..typings import PercentValue, SimpleTimeValue
+from ..ai import typing as ai
+from ..typing import PercentValue, SimpleTimeValue
 
 
 class LightStates(Enum):

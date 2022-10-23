@@ -3,38 +3,37 @@
 
 from abc import ABC
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Final, Mapping
+from typing import Final, Mapping, Protocol, TypeGuard
 
-from ..system.typings import DaylightSavingsTimeInfo, DeviceInfo, TimeInfo, StorageInfo
+from ..connection.typing import CommandFactory as WithCommandFactory
+from ..connection.typing import CommandRequest, CommandResponse
+from .capabilities import Capabilities
+from .typing import DaylightSavingsTimeInfo, DeviceInfo, StorageInfo, TimeInfo
 
-from ..system.capabilities import Capabilities
 
-from . import CommandRequest, CommandResponse
-
-
-class GetAbilitiesRequest(CommandRequest, ABC):
+class GetAbilitiesRequest(CommandRequest, Protocol):
     """Get Capabilities"""
 
     user_name: str | None
 
 
-class GetAbilitiesResponse(CommandResponse, ABC):
+class GetAbilitiesResponse(CommandResponse, Protocol):
     """Get Capabilities Response"""
 
     capabilities: Capabilities
 
 
-class GetDeviceInfoRequest(CommandRequest, ABC):
+class GetDeviceInfoRequest(CommandRequest, Protocol):
     """Get Device Info"""
 
 
-class GetDeviceInfoResponse(CommandResponse, ABC):
+class GetDeviceInfoResponse(CommandResponse, Protocol):
     """Get Device Info Response"""
 
     info: DeviceInfo
 
 
-class GetTimeRequest(CommandRequest, ABC):
+class GetTimeRequest(CommandRequest, Protocol):
     """Get Time"""
 
 
@@ -113,15 +112,56 @@ class GetTimeResponse(CommandResponse, ABC):
         )
 
 
-class RebootRequest(CommandRequest, ABC):
+class RebootRequest(CommandRequest, Protocol):
     """Reboot Request"""
 
 
-class GetHddInfoRequest(CommandRequest, ABC):
+class GetHddInfoRequest(CommandRequest, Protocol):
     """Get HDD Info Request"""
 
 
-class GetHddInfoResponse(CommandResponse, ABC):
+class GetHddInfoResponse(CommandResponse, Protocol):
     """Get HDD Info Response"""
 
     info: Mapping[int, StorageInfo]
+
+
+class CommandFactory(WithCommandFactory, Protocol):
+    """System Command Factory"""
+
+    def create_get_capabilities_request(
+        self, username: str | None
+    ) -> GetAbilitiesRequest:
+        """create GetAbilitiesRequest"""
+
+    def is_get_capabilities_response(
+        self, response: CommandResponse
+    ) -> TypeGuard[GetAbilitiesResponse]:
+        """is GetAbilitiesResponse"""
+
+    def create_get_device_info_request(self) -> GetDeviceInfoRequest:
+        """create GetDeviceInfoRequest"""
+
+    def is_get_device_info_response(
+        self, response: CommandResponse
+    ) -> TypeGuard[GetDeviceInfoResponse]:
+        """is GetDeviceInfoResponse"""
+
+    def create_get_time_request(self) -> GetTimeRequest:
+        """create GetTimeRequest"""
+
+    def is_get_time_response(
+        self, response: CommandResponse
+    ) -> TypeGuard[GetTimeResponse]:
+        """is GetTimeResponse"""
+
+    def create_reboot_request(self) -> RebootRequest:
+        """create RebootRequest"""
+
+    def create_get_hdd_info_request(self) -> GetHddInfoRequest:
+        """create GetHddInfoRequest"""
+
+    def is_get_hdd_info_response(
+        self, response: CommandResponse
+    ) -> TypeGuard[GetHddInfoResponse]:
+        """is GetHddInfoResponse"""

@@ -1,7 +1,7 @@
 """Security Typings"""
 
-from asyncio import Protocol
 from enum import Enum, auto
+from typing import Callable, Protocol
 
 
 class LevelTypes(Enum):
@@ -17,3 +17,9 @@ class UserInfo(Protocol):
 
     user_name: str
     level: LevelTypes
+
+
+class WithSecurity(Protocol):
+    """Security Part"""
+
+    _logout_callbacks: list[Callable[[], None]]

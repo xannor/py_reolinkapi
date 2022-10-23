@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from enum import Enum, auto
 from typing import Annotated, Protocol
 
-from ..typings import DateTimeValue, SimpleTimeValue, WeekDays
+from ..typing import DateTimeValue, SimpleTimeValue, WeekDays
 
 
 class DeviceInfo(Protocol):
@@ -103,3 +103,16 @@ class TimeInfo(DateTimeValue, ABC):
     def to_datetime(self):
         notz = super().to_datetime()
         return notz.astimezone(timezone(timedelta(seconds=self.timezone_offset)))
+
+
+from .capabilities import Capabilities
+
+
+class WithSystem(Protocol):
+    """System Part"""
+
+    async def _ensure_time(self) -> datetime:
+        ...
+
+    async def _ensure_capabilities(self) -> Capabilities:
+        ...
