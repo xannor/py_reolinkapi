@@ -54,6 +54,9 @@ class CommandRequest(Protocol):
 class CommandFactory(Protocol):
     """Command Factory"""
 
+    def is_request(self, request: any) -> TypeGuard[CommandRequest]:
+        """is CommandRequest"""
+
     def is_response(self, response: any) -> TypeGuard[CommandResponse]:
         """is CommandResponse"""
 
@@ -72,6 +75,7 @@ class WithConnection(Protocol, Generic[_T]):
 
     _connect_callbacks: list[Callable[[], Coroutine[any, any, None] | None]]
     _disconnect_callbacks: list[Callable[[], Coroutine[any, any, None] | None]]
+    _error_handlers: list[Callable[[CommandErrorResponse], bool | None]]
 
     @property
     def commands(self) -> _T:

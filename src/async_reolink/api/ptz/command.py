@@ -109,9 +109,7 @@ class CommandFactory(WithCommandFactory, Protocol):
     ) -> TypeGuard[GetPresetResponse]:
         """is GetPresetResponse"""
 
-    def create_set_ptz_preset_request(
-        self, channel_id: int, preset: Preset
-    ) -> SetPresetRequest:
+    def create_set_ptz_preset_request(self, channel_id: int, preset: Preset) -> SetPresetRequest:
         """create SetPresetRequest"""
 
     def create_get_ptz_patrols_request(self, channel_id: int) -> GetPatrolRequest:
@@ -122,9 +120,7 @@ class CommandFactory(WithCommandFactory, Protocol):
     ) -> TypeGuard[GetPatrolResponse]:
         """is GetPatrolResponse"""
 
-    def create_set_ptz_patrol_request(
-        self, channel_id: int, patrol: Patrol
-    ) -> SetPatrolRequest:
+    def create_set_ptz_patrol_request(self, channel_id: int, patrol: Patrol) -> SetPatrolRequest:
         """create SetPatrolRequest"""
 
     def create_get_ptz_tatterns_request(self, channel_id: int) -> GetTatternRequest:
@@ -135,9 +131,7 @@ class CommandFactory(WithCommandFactory, Protocol):
     ) -> TypeGuard[GetTatternResponse]:
         """is GetTatternResponse"""
 
-    def create_set_ptz_tatterns_request(
-        self, channel_id: int, *track: Track
-    ) -> SetTatternRequest:
+    def create_set_ptz_tatterns_request(self, channel_id: int, *track: Track) -> SetTatternRequest:
         """create SetTatternRequest"""
 
     def create_set_ptz_control_request(
@@ -170,7 +164,7 @@ class CommandFactory(WithCommandFactory, Protocol):
     ) -> TypeGuard[GetZoomFocusResponse]:
         """is GetZoomFocusResponse"""
 
-    def create_set_ptz_zoomfocus_request(
+    def create_set_ptz_zoom_focus_request(
         self, channel_id: int, operation: ZoomOperation, position: int
     ) -> SetZoomFocusRequest:
         """create SetZoomFocusRequest"""

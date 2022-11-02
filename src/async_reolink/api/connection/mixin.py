@@ -20,6 +20,7 @@ class Connection(WithConnection[CommandFactory], ABC):
     def __init__(self, *args, **kwargs) -> None:
         self._connect_callbacks = []
         self._disconnect_callbacks = []
+        self._error_handlers = []
         super().__init__(*args, **kwargs)
 
     @property

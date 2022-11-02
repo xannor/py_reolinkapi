@@ -12,9 +12,7 @@ class PTZ(WithConnection[CommandFactory]):
     async def get_ptz_presets(self, channel: int = 0):
         """Get PTZ Presets"""
 
-        async for response in self._execute(
-            self.commands.create_get_ptz_presets_request(channel)
-        ):
+        async for response in self._execute(self.commands.create_get_ptz_presets_request(channel)):
             if not self.commands.is_response(response):
                 break
 
@@ -46,9 +44,7 @@ class PTZ(WithConnection[CommandFactory]):
     async def get_ptz_patrols(self, channel: int = 0):
         """Get PTZ Patrols"""
 
-        async for response in self._execute(
-            self.commands.create_get_ptz_patrols_request(channel)
-        ):
+        async for response in self._execute(self.commands.create_get_ptz_patrols_request(channel)):
             if not self.commands.is_response(response):
                 break
 
@@ -80,9 +76,7 @@ class PTZ(WithConnection[CommandFactory]):
     async def get_ptz_tatterns(self, channel: int = 0):
         """Get PTZ Tatterns"""
 
-        async for response in self._execute(
-            self.commands.create_get_ptz_tatterns_request(channel)
-        ):
+        async for response in self._execute(self.commands.create_get_ptz_tatterns_request(channel)):
             if not self.commands.is_response(response):
                 break
 
@@ -121,9 +115,7 @@ class PTZ(WithConnection[CommandFactory]):
         """PTZ Control"""
 
         async for response in self._execute(
-            self.commands.create_set_ptz_control_request(
-                channel, operation, speed, preset_id
-            )
+            self.commands.create_set_ptz_control_request(channel, operation, speed, preset_id)
         ):
             if not self.commands.is_response(response):
                 break
@@ -187,7 +179,7 @@ class PTZ(WithConnection[CommandFactory]):
 
         raise ReolinkResponseError("Get PTZ Zoom Focus failed")
 
-    async def set_ptz_zoomfocus(
+    async def set_ptz_zoom_focus(
         self,
         position: int,
         operation: ZoomOperation = ZoomOperation.ZOOM,
@@ -196,7 +188,7 @@ class PTZ(WithConnection[CommandFactory]):
         """Set PTZ Zoom"""
 
         async for response in self._execute(
-            self.commands.create_set_ptz_zoomfocus_request(channel, operation, position)
+            self.commands.create_set_ptz_zoom_focus_request(channel, operation, position)
         ):
             if not self.commands.is_response(response):
                 break

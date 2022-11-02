@@ -3,9 +3,9 @@
 import inspect
 from abc import ABC, abstractmethod
 
-from ..connection.typing import WithConnection
+from ..connection.typing import WithConnection, CommandErrorResponse
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
-from ..errors import ReolinkResponseError
+from ..errors import ReolinkResponseError, ErrorCodes
 from .command import CommandFactory, LoginResponse
 from .typing import WithSecurity
 
@@ -17,6 +17,7 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
         self._logout_callbacks = []
         super().__init__(*args, **kwargs)
         self._disconnect_callbacks.append(self.logout)
+        self._error_handlers.append(self._intercept_auth_required)
 
     @property
     @abstractmethod
@@ -46,9 +47,7 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
     ) -> bool:
         """attempt to log into device"""
 
-        async for response in self._execute(
-            self.commands.create_login_request(username, password)
-        ):
+        async for response in self._execute(self.commands.create_login_request(username, password)):
             if not self.commands.is_response(response):
                 break
 
@@ -63,6 +62,21 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
     @abstractmethod
     def _clear_login(self) -> None:
         ...
+
+    def _intercept_auth_required(self, response: CommandErrorResponse):
+        if response.error_code == ErrorCodes.AUTH_REQUIRED:
+            self._clear_login()
+
+    async def _logout(self):
+        try:
+            for callback in self._logout_callbacks:
+                if inspect.iscoroutinefunction(callback):
+                    await callback()
+                else:
+                    callback()
+        finally:
+            # whether clean or not logout always succeeds
+            self._clear_login()
 
     async def logout(self) -> None:
         """Clear authentication information"""
@@ -83,15 +97,7 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
 
             raise ReolinkResponseError("Logout request failed")
         finally:
-            try:
-                for callback in self._logout_callbacks:
-                    if inspect.iscoroutinefunction(callback):
-                        await callback()
-                    else:
-                        callback()
-            finally:
-                # whether clean or not logout always succeeds
-                self._clear_login()
+            await self._logout()
 
     async def get_users(self):
         """Get Device Users"""
