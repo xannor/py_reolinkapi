@@ -7,7 +7,7 @@ from ..connection.typing import WithConnection, CommandErrorResponse
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 from ..errors import ReolinkResponseError, ErrorCodes
 from .command import CommandFactory, LoginResponse
-from .typing import WithSecurity
+from .typing import WithSecurity, AuthenticationId
 
 
 class Security(WithConnection[CommandFactory], WithSecurity, ABC):
@@ -31,12 +31,23 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
 
     @property
     @abstractmethod
-    def authentication_id(self) -> int:
+    def authentication_id(self) -> AuthenticationId:
         """authentication id"""
 
     @abstractmethod
-    async def _prelogin(self, username: str) -> bool:
+    def _create_authentication_id(
+        self, username: str, password: str | None = None
+    ) -> AuthenticationId:
         ...
+
+    async def _prelogin(self, username: str):
+        id = self._create_authentication_id(username)
+        if self.authentication_id.weak != id.weak:
+            await self.logout()
+
+        if not self.is_connected:
+            return False
+        return True
 
     @abstractmethod
     async def _process_login(self, response: LoginResponse) -> bool:

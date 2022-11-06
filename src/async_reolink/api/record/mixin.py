@@ -18,9 +18,7 @@ class Record(WithConnection[CommandFactory], WithSystem):
         """get snapshot"""
 
         buffer = bytearray()
-        async for response in self._execute(
-            self.commands.create_get_snapshot_request(channel)
-        ):
+        async for response in self._execute(self.commands.create_get_snapshot_request(channel)):
             if self.commands.is_response(response) and self.commands.is_error(response):
                 response.throw("Get Snap failed")
 
@@ -39,7 +37,7 @@ class Record(WithConnection[CommandFactory], WithSystem):
         only_status: bool,
         stream_type: StreamTypes,
     ):
-        camera_time = await self._ensure_time()
+        camera_time = await self.get_time()
         tzinfo = camera_time.tzinfo if camera_time is not None else None
 
         if end_time is None:
@@ -78,9 +76,7 @@ class Record(WithConnection[CommandFactory], WithSystem):
         stream_type: StreamTypes = StreamTypes.MAIN,
     ) -> Sequence[SearchStatus]:
         """Perform search but only return available dates in month range"""
-        status = (
-            await self._search(start_time, end_time, channel, True, stream_type)
-        ).status
+        status = (await self._search(start_time, end_time, channel, True, stream_type)).status
         if status is None:
             status = []
         return status
@@ -94,9 +90,7 @@ class Record(WithConnection[CommandFactory], WithSystem):
         stream_type: StreamTypes = StreamTypes.MAIN,
     ) -> Sequence[File]:
         """Search for recordings in range"""
-        files = (
-            await self._search(start_time, end_time, channel, False, stream_type)
-        ).files
+        files = (await self._search(start_time, end_time, channel, False, stream_type)).files
         if files is None:
             files = []
         return files

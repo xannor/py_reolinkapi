@@ -111,8 +111,8 @@ from .capabilities import Capabilities
 class WithSystem(Protocol):
     """System Part"""
 
-    async def _ensure_time(self) -> datetime:
-        ...
+    async def get_capabilities(self, username: str | None = None) -> Capabilities:
+        """Get User Permisions"""
 
-    async def _ensure_capabilities(self) -> Capabilities:
-        ...
+    async def get_time(self) -> datetime:
+        """Get Device Time Information"""

@@ -77,13 +77,9 @@ class WithConnection(Protocol, Generic[_T]):
     _disconnect_callbacks: list[Callable[[], Coroutine[any, any, None] | None]]
     _error_handlers: list[Callable[[CommandErrorResponse], bool | None]]
 
-    @property
-    def commands(self) -> _T:
-        ...
-
-    @property
-    def is_connected(self) -> bool:
-        ...
+    hostname: str
+    commands: _T
+    is_connected: bool
 
     def _execute(self, *args: CommandRequest) -> AsyncIterable[CommandResponse | bytes]:
         ...
