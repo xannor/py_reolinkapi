@@ -103,16 +103,3 @@ class TimeInfo(DateTimeValue, ABC):
     def to_datetime(self):
         notz = super().to_datetime()
         return notz.astimezone(timezone(timedelta(seconds=self.timezone_offset)))
-
-
-from .capabilities import Capabilities
-
-
-class WithSystem(Protocol):
-    """System Part"""
-
-    async def get_capabilities(self, username: str | None = None) -> Capabilities:
-        """Get User Permisions"""
-
-    async def get_time(self) -> datetime:
-        """Get Device Time Information"""

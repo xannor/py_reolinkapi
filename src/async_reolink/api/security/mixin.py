@@ -2,15 +2,20 @@
 
 import inspect
 from abc import ABC, abstractmethod
+from typing import TypeGuard
 
-from ..connection.typing import WithConnection, CommandErrorResponse
+from ..connection.model import ErrorResponse, Response
+
+from ..connection.part import Connection as ConnectionPart
 from ..const import DEFAULT_PASSWORD, DEFAULT_USERNAME
 from ..errors import ReolinkResponseError, ErrorCodes
-from .command import CommandFactory, LoginResponse
-from .typing import WithSecurity, AuthenticationId
+from .typing import AuthenticationId
+from .part import Security as SecurityPart
+
+from . import command
 
 
-class Security(WithConnection[CommandFactory], WithSecurity, ABC):
+class Security(ConnectionPart, SecurityPart, ABC):
     """Abstract Security Mixin"""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -50,7 +55,15 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
         return True
 
     @abstractmethod
-    async def _process_login(self, response: LoginResponse) -> bool:
+    async def _process_login(self, response: command.LoginResponse) -> bool:
+        ...
+
+    @abstractmethod
+    def _create_login(self, username: str, password: str) -> command.LoginRequest:
+        ...
+
+    @abstractmethod
+    def _is_login_response(self, response: Response) -> TypeGuard[command.LoginResponse]:
         ...
 
     async def login(
@@ -58,14 +71,14 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
     ) -> bool:
         """attempt to log into device"""
 
-        async for response in self._execute(self.commands.create_login_request(username, password)):
-            if not self.commands.is_response(response):
+        async for response in self._execute(self._create_login(username, password)):
+            if not isinstance(response, Response):
                 break
 
-            if self.commands.is_error(response):
+            if isinstance(response, ErrorResponse):
                 response.throw("Login request failed")
 
-            if self.commands.is_login_response(response):
+            if self._is_login_response(response):
                 return await self._process_login(response)
 
         raise ReolinkResponseError("Login request failed")
@@ -74,7 +87,7 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
     def _clear_login(self) -> None:
         ...
 
-    def _intercept_auth_required(self, response: CommandErrorResponse):
+    def _intercept_auth_required(self, response: ErrorResponse):
         if response.error_code == ErrorCodes.AUTH_REQUIRED:
             self._clear_login()
 
@@ -89,6 +102,10 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
             # whether clean or not logout always succeeds
             self._clear_login()
 
+    @abstractmethod
+    def _create_logout(self) -> command.LogoutRequest:
+        ...
+
     async def logout(self) -> None:
         """Clear authentication information"""
 
@@ -96,31 +113,39 @@ class Security(WithConnection[CommandFactory], WithSecurity, ABC):
             return
 
         try:
-            async for response in self._execute(self.commands.create_logout_request()):
-                if not self.commands.is_response(response):
+            async for response in self._execute(self._create_logout()):
+                if not isinstance(response, Response):
                     break
 
-                if self.commands.is_error(response):
+                if isinstance(response, ErrorResponse):
                     response.throw("Logout request failed")
 
-                if self.commands.is_success(response):
+                if self._is_success(response):
                     return
 
             raise ReolinkResponseError("Logout request failed")
         finally:
             await self._logout()
 
+    @abstractmethod
+    def _create_get_user(self) -> command.GetUserRequest:
+        ...
+
+    @abstractmethod
+    def _is_get_user_response(self, response: Response) -> TypeGuard[command.GetUserResponse]:
+        ...
+
     async def get_users(self):
         """Get Device Users"""
 
-        async for response in self._execute(self.commands.create_get_user_request()):
-            if not self.commands.is_response(response):
+        async for response in self._execute(self._create_get_user()):
+            if not isinstance(response, Response):
                 break
 
-            if self.commands.is_get_user_response(response):
+            if self._is_get_user_response(response):
                 return response.users
 
-            if self.commands.is_error(response):
+            if isinstance(response, ErrorResponse):
                 response.throw("Get Users request failed")
 
         raise ReolinkResponseError("Get Users request failed")

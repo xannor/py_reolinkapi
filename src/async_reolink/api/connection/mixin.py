@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncIterable, Iterable
-
-from async_reolink.api.connection.typing import CommandRequest, CommandResponse
+from typing import TYPE_CHECKING, AsyncIterable, Iterable, TypeGuard
 
 from ..const import DEFAULT_TIMEOUT
 
-from ..command_factory import CommandFactory
+from .typing import ResponseCode
 
-from .typing import WithConnection
+from .model import Request, Response
+
+from .part import Connection as ConnectionPart
 
 
-class Connection(WithConnection[CommandFactory], ABC):
+class Connection(ConnectionPart, ABC):
     """Abstract Connection Mixin"""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -56,18 +56,21 @@ class Connection(WithConnection[CommandFactory], ABC):
     async def disconnect(self):
         """disconnect from device"""
 
-    @property
     @abstractmethod
-    def commands(self) -> CommandFactory.CommandFactory:
-        """command factory instance"""
+    def _execute(self, *args: Request) -> AsyncIterable[Response | bytes]:
+        ...
 
     @abstractmethod
-    def _execute(self, *args: CommandRequest) -> AsyncIterable[CommandResponse | bytes]:
+    def _has_response_code(self, response: Response) -> TypeGuard[ResponseCode]:
+        ...
+
+    @abstractmethod
+    def _is_success_response(self, response: Response) -> bool:
         ...
 
     def batch(
         self,
-        commands: Iterable[CommandRequest],
+        commands: Iterable[Request],
     ):
         """Execute a batch of commands"""
 

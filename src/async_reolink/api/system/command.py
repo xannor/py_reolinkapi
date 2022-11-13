@@ -3,37 +3,35 @@
 
 from abc import ABC
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Final, Mapping, Protocol, TypeGuard
+from typing import Final, Mapping, Protocol
 
-from ..connection.typing import CommandFactory as WithCommandFactory
-from ..connection.typing import CommandRequest, CommandResponse
 from .capabilities import Capabilities
 from .typing import DaylightSavingsTimeInfo, DeviceInfo, StorageInfo, TimeInfo
 
 
-class GetAbilitiesRequest(CommandRequest, Protocol):
+class GetAbilitiesRequest(Protocol):
     """Get Capabilities"""
 
     user_name: str | None
 
 
-class GetAbilitiesResponse(CommandResponse, Protocol):
+class GetAbilitiesResponse(Protocol):
     """Get Capabilities Response"""
 
     capabilities: Capabilities
 
 
-class GetDeviceInfoRequest(CommandRequest, Protocol):
+class GetDeviceInfoRequest(Protocol):
     """Get Device Info"""
 
 
-class GetDeviceInfoResponse(CommandResponse, Protocol):
+class GetDeviceInfoResponse(Protocol):
     """Get Device Info Response"""
 
     info: DeviceInfo
 
 
-class GetTimeRequest(CommandRequest, Protocol):
+class GetTimeRequest(Protocol):
     """Get Time"""
 
 
@@ -95,7 +93,7 @@ class _timezone(tzinfo):
         return _ZERO
 
 
-class GetTimeResponse(CommandResponse, ABC):
+class GetTimeResponse(ABC):
     """Get Time Response"""
 
     dst: DaylightSavingsTimeInfo
@@ -107,61 +105,18 @@ class GetTimeResponse(CommandResponse, ABC):
 
     def to_datetime(self):
         """Get device time as full datetime and timezone"""
-        return datetime.combine(
-            self.time.to_date(), self.time.to_time(), self.to_timezone()
-        )
+        return datetime.combine(self.time.to_date(), self.time.to_time(), self.to_timezone())
 
 
-class RebootRequest(CommandRequest, Protocol):
+class RebootRequest(Protocol):
     """Reboot Request"""
 
 
-class GetHddInfoRequest(CommandRequest, Protocol):
+class GetHddInfoRequest(Protocol):
     """Get HDD Info Request"""
 
 
-class GetHddInfoResponse(CommandResponse, Protocol):
+class GetHddInfoResponse(Protocol):
     """Get HDD Info Response"""
 
     info: Mapping[int, StorageInfo]
-
-
-class CommandFactory(WithCommandFactory, Protocol):
-    """System Command Factory"""
-
-    def create_get_capabilities_request(
-        self, username: str | None
-    ) -> GetAbilitiesRequest:
-        """create GetAbilitiesRequest"""
-
-    def is_get_capabilities_response(
-        self, response: CommandResponse
-    ) -> TypeGuard[GetAbilitiesResponse]:
-        """is GetAbilitiesResponse"""
-
-    def create_get_device_info_request(self) -> GetDeviceInfoRequest:
-        """create GetDeviceInfoRequest"""
-
-    def is_get_device_info_response(
-        self, response: CommandResponse
-    ) -> TypeGuard[GetDeviceInfoResponse]:
-        """is GetDeviceInfoResponse"""
-
-    def create_get_time_request(self) -> GetTimeRequest:
-        """create GetTimeRequest"""
-
-    def is_get_time_response(
-        self, response: CommandResponse
-    ) -> TypeGuard[GetTimeResponse]:
-        """is GetTimeResponse"""
-
-    def create_reboot_request(self) -> RebootRequest:
-        """create RebootRequest"""
-
-    def create_get_hdd_info_request(self) -> GetHddInfoRequest:
-        """create GetHddInfoRequest"""
-
-    def is_get_hdd_info_response(
-        self, response: CommandResponse
-    ) -> TypeGuard[GetHddInfoResponse]:
-        """is GetHddInfoResponse"""

@@ -1,25 +1,33 @@
 """Record"""
 
+from abc import ABC, abstractmethod
 from datetime import datetime, time, timedelta
-from typing import Sequence
+from typing import Sequence, TypeGuard
 
-from ..connection.typing import WithConnection
+from ..connection.model import ErrorResponse, Response
+
+from ..connection.part import Connection as ConnectionPart
 from ..errors import ReolinkResponseError
-from ..system.typing import WithSystem
+from ..system.part import System as SystemPart
 from ..typing import StreamTypes
-from .command import CommandFactory
 from .typing import File, SearchStatus
 
+from . import command
 
-class Record(WithConnection[CommandFactory], WithSystem):
+
+class Record(ConnectionPart, SystemPart, ABC):
     """Record Mixin"""
+
+    @abstractmethod
+    def _create_get_snapshot(self, channel_id: int) -> command.GetSnapshotRequest:
+        ...
 
     async def get_snap(self, channel: int = 0):
         """get snapshot"""
 
         buffer = bytearray()
-        async for response in self._execute(self.commands.create_get_snapshot_request(channel)):
-            if self.commands.is_response(response) and self.commands.is_error(response):
+        async for response in self._execute(self._create_get_snapshot(channel)):
+            if isinstance(response, Response) and isinstance(response, ErrorResponse):
                 response.throw("Get Snap failed")
 
             if not isinstance(response, bytes):
@@ -28,6 +36,23 @@ class Record(WithConnection[CommandFactory], WithSystem):
             buffer += bytearray(response)
 
         return bytes(buffer)
+
+    @abstractmethod
+    def _create_search(
+        self,
+        channel_id: int,
+        start_time: datetime,
+        end_time: datetime,
+        only_status: bool,
+        stream_type: StreamTypes,
+    ) -> command.SearchRecordingsRequest:
+        ...
+
+    @abstractmethod
+    def _is_search_response(
+        self, response: Response
+    ) -> TypeGuard[command.SearchRecordingsResponse]:
+        ...
 
     async def _search(
         self,
@@ -52,17 +77,15 @@ class Record(WithConnection[CommandFactory], WithSystem):
             start_time = start_time.astimezone(tzinfo)
 
         async for response in self._execute(
-            self.commands.create_search_request(
-                channel, start_time, end_time, only_status, stream_type
-            )
+            self._create_search(channel, start_time, end_time, only_status, stream_type)
         ):
-            if not self.commands.is_response(response):
+            if not isinstance(response, Response):
                 break
 
-            if self.commands.is_error(response):
+            if isinstance(response, ErrorResponse):
                 response.throw("Search failed")
 
-            if self.commands.is_search_response(response):
+            if self._is_search_response(response):
                 return response
 
         raise ReolinkResponseError("Search failed")
