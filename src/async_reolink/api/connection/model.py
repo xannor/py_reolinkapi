@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC
+from asyncio import Protocol
 from inspect import isabstract
-from typing import Callable
 
 from ..errors import ReolinkResponseError
 
@@ -19,37 +19,59 @@ class Request(ABC):
     id: int
 
 
+class ResponseHandler(Protocol):
+    """Response Handler Callback"""
+
+    def __call__(
+        self, response: any, /, request: Request | None = None, **kwds: any
+    ) -> Response | None:
+        ...
+
+
+class ResponseFactory(ResponseHandler):
+    """Factory descriptor for handling response creation"""
+
+    __slots__ = ("_handlers", "_class", "_name")
+
+    def __init__(self) -> None:
+        self._handlers: list[ResponseHandler] = []
+
+    def __set_name__(self, owner: type, name: str):
+        self._name = name
+        self._class = owner
+
+    def __get__(self, obj: any, objType: type | None = None):
+        if objType is self._class:
+            return self
+        raise AttributeError()
+
+    def __call__(self, response: any, /, request: Request | None = None, **kwds: any):
+        for handler in self._handlers:
+            if result := handler(response, request, **kwds):
+                return result
+        return None
+
+    def register(self, handler: ResponseHandler):
+        self._handlers.append(handler)
+
+
 class Response(ABC):
     """API Response"""
 
     __slots__ = ()
 
-    __handlers: list[ResponseHandler] = []
-
     request_id: int | None
 
-    @classmethod
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         if (
             not isabstract(cls)
-            and hasattr(cls, "from_response")
-            and callable(cls.from_response)
-            and cls.from_response is not Response.from_response
+            and (handler := getattr(cls, "from_response", None))
+            and callable(handler)
         ):
-            Response.__handlers.append(cls.from_response)
+            Response.from_response.register(handler)
 
-    @classmethod
-    def from_response(cls, response: any, request: Request | None = None) -> "Response" | None:
-        """Returns constructed class if response is valid otherwise None"""
-        assert cls is Response
-        for handler in cls.__handlers:
-            if result := handler(response, request):
-                return result
-        return None
-
-
-ResponseHandler = Callable[[any, Request | None], Response | None]
+    from_response = ResponseFactory()
 
 
 class ErrorResponse(Response, ErrorResponseValue, ABC):

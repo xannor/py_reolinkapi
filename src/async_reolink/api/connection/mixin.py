@@ -49,7 +49,7 @@ class Connection(ConnectionPart, ABC):
         hostname: str,
         port: int = None,
         timeout: float = DEFAULT_TIMEOUT,
-    ):
+    ) -> bool:
         """setup connection to device"""
 
     @abstractmethod
