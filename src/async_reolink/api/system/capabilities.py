@@ -12,13 +12,13 @@ class Permissions(Flag):
     READ = auto()
 
 
-_T = TypeVar("_T")
+T = TypeVar("T")
 
 
-class Capability(Protocol[_T]):
+class Capability(Protocol[T]):
     """Capability"""
 
-    value: _T
+    value: T
     permissions: Permissions
 
 

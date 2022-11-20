@@ -1,9 +1,16 @@
 """System Models"""
 
+from abc import ABC
+from datetime import date, datetime, timedelta, timezone
 from typing import Final, TypeVar, final
 
 from .capabilities import Capability, Permissions
-from .typing import DeviceInfo
+
+from ..typing import WeekDays
+
+from . import typing
+from .. import model
+
 
 NO_PERMISSIONS: Final[Permissions] = 0
 
@@ -52,7 +59,7 @@ NO_CAPABILITY: Final = _Capability()
 
 
 @final
-class _DeviceInfo(DeviceInfo):
+class _DeviceInfo(typing.DeviceInfo):
     """No DeviceInfo"""
 
     __slots__ = ()
@@ -77,3 +84,40 @@ class _DeviceInfo(DeviceInfo):
 
 
 NO_DEVICEINFO: Final = _DeviceInfo()
+
+
+class DaylightSavingsTimeInfo(typing.DaylightSavingsTimeInfo, ABC):
+    """Daylight Savings Time Info"""
+
+    class TimeInfo(typing.DaylightSavingsTimeInfo.TimeInfo, model.SimpleTime, ABC):
+        """Time Info"""
+
+        # pylint: disable=no-self-argument
+        def to_datetime(__time: typing.DaylightSavingsTimeInfo.TimeInfo, year: int):
+            """get date time for dst point with given year"""
+            _date = date(year, __time.month, 1)
+            delta = timedelta(weeks=__time.week, days=int(__time.week))
+            delta -= timedelta(days=_date.weekday())
+            if __time.weekday != WeekDays.MONDAY:
+                delta += timedelta(days=__time.weekday.value - WeekDays.MONDAY.value)
+            _date += delta
+            if isinstance(__time, TimeInfo):
+                _time = __time.to_time()
+            else:
+                _time = model.SimpleTime.to_time(__time)
+            return datetime.combine(_date, _time)
+
+    start: TimeInfo
+    end: TimeInfo
+
+
+class TimeInfo(typing.TimeInfo, model.DateTime, ABC):
+    """Time Info"""
+
+    # pylint: disable=no-self-argument
+    def to_datetime(__time: typing.TimeInfo):
+        """Convert Time Info to datetime with timezone"""
+
+        notz = model.DateTime.to_datetime(__time)
+        # Reolink does positive offest python expects a negative one
+        return notz.astimezone(timezone(timedelta(seconds=-__time.timezone_offset)))

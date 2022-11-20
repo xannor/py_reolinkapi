@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Mapping, Protocol
 
 from ..ai import typing as ai
-from ..typing import PercentValue, SimpleTimeValue
+from ..typing import PercentValue, SimpleTime
 
 
 class LightStates(Enum):
@@ -18,8 +18,8 @@ class LightStates(Enum):
 class LightingSchedule(Protocol):
     """Lighting Schedule"""
 
-    start: SimpleTimeValue
-    end: SimpleTimeValue
+    start: SimpleTime
+    end: SimpleTime
 
 
 class WhiteLedInfo(Protocol):

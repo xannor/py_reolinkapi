@@ -1,11 +1,10 @@
 """System typings"""
 
 from abc import ABC
-from datetime import date, datetime, timedelta, timezone
 from enum import Enum, auto
 from typing import Annotated, Protocol
 
-from ..typing import DateTimeValue, SimpleTimeValue, WeekDays
+from ..typing import DateTime, SimpleTime, WeekDays
 
 
 class DeviceInfo(Protocol):
@@ -73,33 +72,19 @@ class DaylightSavingsTimeInfo(Protocol):
     enabled: bool
     hour_offset: Annotated[int, range(1, 2)]
 
-    class TimeInfo(SimpleTimeValue, ABC):
+    class TimeInfo(SimpleTime, Protocol):
         """Time info"""
 
         month: Annotated[int, range(1, 12)]
         week: Annotated[int, range(1, 5)]
         weekday: WeekDays
 
-        def to_datetime(self, year: int):
-            """get date time for dst point with given year"""
-            _date = date(year, self.month, 1)
-            delta = timedelta(weeks=self.week, days=int(self.week))
-            delta -= timedelta(days=_date.weekday())
-            if self.weekday != WeekDays.MONDAY:
-                delta += timedelta(days=self.weekday.value - WeekDays.MONDAY.value)
-            _date += delta
-            return datetime.combine(_date, self.to_time())
-
     start: TimeInfo
     end: TimeInfo
 
 
-class TimeInfo(DateTimeValue, ABC):
+class TimeInfo(DateTime, Protocol):
     """Device Time Info"""
 
     hour_format: HourFormat
     timezone_offset: int
-
-    def to_datetime(self):
-        notz = super().to_datetime()
-        return notz.astimezone(timezone(timedelta(seconds=self.timezone_offset)))

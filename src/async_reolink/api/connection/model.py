@@ -77,6 +77,6 @@ class Response(ABC):
 class ErrorResponse(Response, ErrorResponseValue, ABC):
     """API Response Error"""
 
-    def throw(self, *args):
+    def throw(__response: ErrorResponseValue, *args):
         """throw as error"""
-        raise ReolinkResponseError(*args, code=self.error_code, details=self.details)
+        raise ReolinkResponseError(*args, code=__response.error_code, details=__response.details)

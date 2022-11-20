@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Annotated, Iterable, Iterator, Protocol
 
-from ..typing import StreamTypes, DateTimeValue
+from ..typing import StreamTypes, DateTime
 
 
 class Search(Protocol):
@@ -11,8 +11,8 @@ class Search(Protocol):
 
     status_only: bool
     stream_type: StreamTypes
-    start: DateTimeValue
-    end: DateTimeValue
+    start: DateTime
+    end: DateTime
 
 
 class SearchStatus(Protocol):
@@ -35,5 +35,5 @@ class File(Protocol):
     name: str
     size: int
     type: str
-    start: DateTimeValue
-    end: DateTimeValue
+    start: DateTime
+    end: DateTime
