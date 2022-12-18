@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC
-from asyncio import Protocol
-from inspect import isabstract
+from typing import Protocol
+
+from .._utilities.abc import abstractclass, isabstract
 
 from ..errors import ReolinkResponseError
 
-from .typing import ErrorResponseValue
+from ..connection.typing import ErrorResponseValue
 
 
+@abstractclass
 class Request(ABC):
     """API Request"""
 
@@ -41,13 +43,13 @@ class ResponseFactory(ResponseHandler):
         self._class = owner
 
     def __get__(self, obj: any, objType: type | None = None):
-        if objType is self._class:
+        if issubclass(objType, self._class):
             return self
         raise AttributeError()
 
     def __call__(self, response: any, /, request: Request | None = None, **kwds: any):
         for handler in self._handlers:
-            if result := handler(response, request, **kwds):
+            if result := handler(response, request=request, **kwds):
                 return result
         return None
 
@@ -55,6 +57,7 @@ class ResponseFactory(ResponseHandler):
         self._handlers.append(handler)
 
 
+@abstractclass
 class Response(ABC):
     """API Response"""
 
@@ -67,6 +70,7 @@ class Response(ABC):
         if (
             not isabstract(cls)
             and (handler := getattr(cls, "from_response", None))
+            and handler != Response.from_response
             and callable(handler)
         ):
             Response.from_response.register(handler)
@@ -74,6 +78,7 @@ class Response(ABC):
     from_response = ResponseFactory()
 
 
+@abstractclass
 class ErrorResponse(Response, ErrorResponseValue, ABC):
     """API Response Error"""
 

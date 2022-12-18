@@ -63,7 +63,9 @@ class Security(ConnectionPart, SecurityPart, ABC):
         ...
 
     @abstractmethod
-    def _is_login_response(self, response: Response) -> TypeGuard[command.LoginResponse]:
+    def _is_login_response(
+        self, response: Response
+    ) -> TypeGuard[command.LoginResponse]:
         ...
 
     async def login(
@@ -120,7 +122,7 @@ class Security(ConnectionPart, SecurityPart, ABC):
                 if isinstance(response, ErrorResponse):
                     response.throw("Logout request failed")
 
-                if self._is_success(response):
+                if self._is_success_response(response):
                     return
 
             raise ReolinkResponseError("Logout request failed")
@@ -132,7 +134,9 @@ class Security(ConnectionPart, SecurityPart, ABC):
         ...
 
     @abstractmethod
-    def _is_get_user_response(self, response: Response) -> TypeGuard[command.GetUserResponse]:
+    def _is_get_user_response(
+        self, response: Response
+    ) -> TypeGuard[command.GetUserResponse]:
         ...
 
     async def get_users(self):

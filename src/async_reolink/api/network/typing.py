@@ -1,7 +1,7 @@
 """Network Typings"""
 
 from enum import Enum, auto
-from typing import Protocol
+from typing import Protocol, Sequence
 
 
 class LinkTypes(Enum):
@@ -23,8 +23,7 @@ class DNSInfo(Protocol):
     """DNS Info"""
 
     auto: bool
-    dns_1: str
-    dns_2: str
+    dns: Sequence[str]
 
 
 class LinkInfo(Protocol):

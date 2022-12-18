@@ -2,6 +2,8 @@
 from enum import Enum, auto
 from typing import Annotated, Protocol, Sequence
 
+from ..connection.typing import ChannelValue
+
 from ..typing import size
 
 
