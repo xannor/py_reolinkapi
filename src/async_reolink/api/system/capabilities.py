@@ -1,24 +1,29 @@
 """Abilities"""
 
 from enum import Enum, Flag, auto
-from typing import Mapping, Protocol, TypeVar
+from typing import Mapping, Protocol
+from typing_extensions import TypeVar
 
 
 class Permissions(Flag):
     """Ability Permissions"""
 
+    # NONE = 0
     OPTION = auto()
     WRITE = auto()
     READ = auto()
 
 
-T = TypeVar("T")
+_CT = TypeVar("CT", infer_variance=True)
 
 
-class Capability(Protocol[T]):
+class Capability(Protocol[_CT]):
     """Capability"""
 
-    value: T
+    Type: type[_CT]
+    Permissions: type[Permissions]
+
+    value: _CT
     permissions: Permissions
 
 
