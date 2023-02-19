@@ -77,7 +77,7 @@ class _DeviceInfo(typing.DeviceInfo):
         return False
 
     def __getattr__(self, __name: str):
-        return NO_DEVICEINFO
+        return None
 
     def __len__(self):
         return 0

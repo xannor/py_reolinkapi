@@ -1,9 +1,12 @@
 """ABC helpers"""
 
 import inspect
+from typing import TypeVar
+
+_C = TypeVar("_C", bound=type)
 
 
-def abstractclass(decorated_cls: type):
+def abstractclass(decorated_cls: _C):
     def abc_new(cls: type, *args, **kwargs):
         if cls is decorated_cls:
             raise TypeError("Cannot instanciate abstract class {}".format(decorated_cls.__name__))

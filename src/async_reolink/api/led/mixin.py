@@ -118,7 +118,7 @@ class LED(ConnectionPart, ABC):
     async def get_white_led(self, channel: int = 0):
         """Get White Led State Info"""
 
-        async for response in self._execute(self._create_get_power_led(channel)):
+        async for response in self._execute(self._create_get_white_led(channel)):
             if not isinstance(response, Response):
                 break
 
