@@ -53,7 +53,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ Preset failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ Preset failed")
@@ -97,7 +97,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ Preset failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ Preset failed")
@@ -141,7 +141,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ Tattern failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ Tattern failed")
@@ -174,7 +174,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ Control failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ Control failed")
@@ -220,7 +220,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ AutoFocus failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ AutoFocus failed")
@@ -273,7 +273,7 @@ class PTZ(ConnectionPart, ABC):
             if isinstance(response, ErrorResponse):
                 response.throw("Set PTZ Zoom/Focus failed")
 
-            if self._is_success(response):
+            if self._is_success_response(response):
                 return True
 
         raise ReolinkResponseError("Set PTZ Zoom/Focus failed")

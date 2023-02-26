@@ -1,30 +1,51 @@
 """Abilities"""
 
 from enum import Enum, Flag, auto
-from typing import Mapping, Protocol
+from typing import Mapping, Protocol, ClassVar
 from typing_extensions import TypeVar
 
 
 class Permissions(Flag):
     """Ability Permissions"""
 
-    # NONE = 0
     OPTION = auto()
     WRITE = auto()
     READ = auto()
 
 
-_CT = TypeVar("CT", infer_variance=True)
+_CT = TypeVar("_CT", infer_variance=True)
+
+
+_subtypes: dict[type, type] = {}
+
+
+class classproperty:
+    """@classproperty"""
+
+    def __init__(self, getter):
+        self.fget = classmethod(getter)
+
+    def __get__(self, *a):
+        return self.fget.__get__(*a)
 
 
 class Capability(Protocol[_CT]):
     """Capability"""
 
-    Type: type[_CT]
-    Permissions: type[Permissions]
+    @classproperty
+    def Type(cls) -> type[_CT]:
+        return _subtypes.get(cls)
+
+    Permissions: ClassVar = Permissions
+
+    def __class_getitem__(cls, params):
+        alias = super().__class_getitem__(params)
+        if not isinstance(params, TypeVar):
+            _subtypes[alias] = params
+        return alias
 
     value: _CT
-    permissions: Permissions
+    permissions: Permissions | None
 
 
 class CloudStorage(Flag):
@@ -113,6 +134,7 @@ class Osd(Enum):
 class PTZControl(Enum):
     """PTZ Control"""
 
+    NONE = 0
     ZOOM = auto()
     ZOOM_FOCUS = auto()
     """Zoom and Focus"""
